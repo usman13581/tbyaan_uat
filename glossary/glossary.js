@@ -20,37 +20,37 @@ var GlossaryApp = (function () {
                 '<div class="gls-names-grid">' +
                     '<div class="gls-name-block">' +
                         '<label class="gls-label">Term Name (EN)</label>' +
-                        '<input id="gls-name-en" type="text" class="gls-input" name="f02">' +
+                        '<input id="gls-name-en" type="text" class="gls-input gls-user-field" name="f02" readonly>' +
                     '</div>' +
                     '<div class="gls-name-block">' +
                         '<label class="gls-label gls-lbl-ar">&#1575;&#1587;&#1605; &#1575;&#1604;&#1605;&#1589;&#1591;&#1604;&#1581;</label>' +
-                        '<input id="gls-name-ar" type="text" class="gls-input gls-rtl" name="f03" dir="rtl">' +
+                        '<input id="gls-name-ar" type="text" class="gls-input gls-rtl gls-user-field" name="f03" dir="rtl" readonly>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
             '<div class="gls-term-body">' +
                 '<div class="gls-two-col">' +
-                    '<div class="gls-field-group"><label class="gls-label">Code</label><input id="gls-code" type="text" class="gls-input" name="f04"></div>' +
-                    '<div class="gls-field-group"><label class="gls-label">Term Ref</label><input id="gls-termref" type="text" class="gls-input" name="f05"></div>' +
-                    '<div class="gls-field-group"><label class="gls-label">Parent Ref</label><input id="gls-parentref" type="text" class="gls-input" name="f06"></div>' +
-                    '<div class="gls-field-group"><label class="gls-label">Source</label><input id="gls-source" type="text" class="gls-input" name="f11"></div>' +
+                    '<div class="gls-field-group"><label class="gls-label">Code</label><input id="gls-code" type="text" class="gls-input gls-readonly" name="f04" readonly></div>' +
+                    '<div class="gls-field-group"><label class="gls-label">Term Ref</label><input id="gls-termref" type="text" class="gls-input gls-readonly" name="f05" readonly></div>' +
+                    '<div class="gls-field-group"><label class="gls-label">Parent Ref</label><input id="gls-parentref" type="text" class="gls-input gls-user-field" name="f06" readonly></div>' +
+                    '<div class="gls-field-group"><label class="gls-label">Source</label><input id="gls-source" type="text" class="gls-input gls-user-field" name="f11" readonly></div>' +
                 '</div>' +
                 '<div class="gls-two-col">' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label">Dataset (EN)</label>' +
-                        '<input id="gls-dataset-en" type="text" class="gls-input" name="f07">' +
+                        '<input id="gls-dataset-en" type="text" class="gls-input gls-user-field" name="f07" readonly>' +
                     '</div>' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label gls-lbl-ar">&#1575;&#1587;&#1605; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577; &#1575;&#1604;&#1576;&#1610;&#1575;&#1606;&#1575;&#1578;</label>' +
-                        '<input id="gls-dataset-ar" type="text" class="gls-input gls-rtl" name="f08" dir="rtl">' +
+                        '<input id="gls-dataset-ar" type="text" class="gls-input gls-rtl gls-user-field" name="f08" dir="rtl" readonly>' +
                     '</div>' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label">Definition (EN)</label>' +
-                        '<textarea id="gls-def-en" class="gls-textarea" name="f09"></textarea>' +
+                        '<textarea id="gls-def-en" class="gls-textarea gls-user-field" name="f09" readonly></textarea>' +
                     '</div>' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label gls-lbl-ar">&#1575;&#1604;&#1578;&#1593;&#1585;&#1610;&#1601;</label>' +
-                        '<textarea id="gls-def-ar" class="gls-textarea gls-rtl" name="f10" dir="rtl"></textarea>' +
+                        '<textarea id="gls-def-ar" class="gls-textarea gls-rtl gls-user-field" name="f10" dir="rtl" readonly></textarea>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
@@ -63,10 +63,6 @@ var GlossaryApp = (function () {
                 '<span class="gls-total">1</span>' +
             '</div>' +
             '<button type="button" class="gls-nav-btn gls-next">Next &#8594;</button>' +
-            '<div class="gls-right-actions">' +
-                '<button type="button" class="gls-nav-btn gls-submit-changes gls-btn-submit" disabled>&#10003; Submit Changes</button>' +
-                '<button type="button" class="gls-nav-btn gls-new-term">&#43; New Term</button>' +
-            '</div>' +
         '</div>';
 
     /* ── Inject JSON data into fixed card ─────────────────── */
@@ -103,9 +99,12 @@ var GlossaryApp = (function () {
         curSeq   = d.seq;
         curTotal = d.total;
 
-        /* disable submit button on fresh term load */
-        var submitBtn = container.querySelector('.gls-submit-changes');
-        if (submitBtn) submitBtn.disabled = true;
+        /* reset to view mode on fresh term load */
+        container.querySelectorAll('.gls-user-field').forEach(function (f) { f.readOnly = true; });
+        var hdrEdit   = document.getElementById('gls-hdr-edit');
+        var hdrSubmit = document.getElementById('gls-hdr-submit');
+        if (hdrEdit)   { hdrEdit.style.display = '';       hdrEdit.disabled = false; }
+        if (hdrSubmit) { hdrSubmit.style.display = 'none'; hdrSubmit.disabled = true; }
         isDirty = false;
     }
 
@@ -213,6 +212,12 @@ var GlossaryApp = (function () {
                 '</div>' +
             '</div>';
 
+        /* hide edit/submit header buttons while in new-term mode */
+        var hdrEdit   = document.getElementById('gls-hdr-edit');
+        var hdrSubmit = document.getElementById('gls-hdr-submit');
+        if (hdrEdit)   hdrEdit.style.display   = 'none';
+        if (hdrSubmit) hdrSubmit.style.display = 'none';
+
         /* set topic / theme labels */
         var nt  = container.querySelector('.gls-new-topic');
         var nth = container.querySelector('.gls-new-theme');
@@ -306,6 +311,9 @@ var GlossaryApp = (function () {
 
         var submitBtn = container.querySelector('.gls-submit-changes');
         if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
+        var hdrEdit   = document.getElementById('gls-hdr-edit');
+        var hdrSubmit = document.getElementById('gls-hdr-submit');
+        if (hdrSubmit) { hdrSubmit.disabled = true; hdrSubmit.textContent = '\u2713 Saving...'; }
 
         var payload = {
             type:       isNew ? 'NEW' : 'UPDATE',
@@ -333,6 +341,7 @@ var GlossaryApp = (function () {
                     var result;
                     try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
                     if (result.status === 'ok') {
+                        if (hdrSubmit) hdrSubmit.textContent = '\u2713 Saved';
                         container.innerHTML =
                             '<div class="gls-success-msg">' +
                                 '<div class="gls-success-icon">&#10003;</div>' +
@@ -345,6 +354,7 @@ var GlossaryApp = (function () {
                             '</div>';
                     } else {
                         if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '&#10003; Submit for Approval'; }
+                        if (hdrSubmit) { hdrSubmit.disabled = false; hdrSubmit.textContent = '\u2713 Submit Changes'; }
                         var errDiv = document.createElement('div');
                         errDiv.className = 'gls-val-errors';
                         errDiv.textContent = result.message || 'Save failed. Please try again.';
@@ -354,6 +364,8 @@ var GlossaryApp = (function () {
                 },
                 error: function (xhr) {
                     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '&#10003; Submit for Approval'; }
+                    if (hdrSubmit) { hdrSubmit.disabled = false; hdrSubmit.textContent = '\u2713 Submit Changes'; }
+                    if (hdrEdit)   { /* stays hidden — user is still in edit mode */ }
                     var errDiv = document.createElement('div');
                     errDiv.className = 'gls-val-errors';
                     errDiv.textContent = xhr.responseText || 'Network error. Please try again.';
@@ -614,6 +626,46 @@ var GlossaryApp = (function () {
         }
     }
 
+    /* ── Header action buttons (search bar) ────────────────── */
+    function initHeaderBtns() {
+        var hdrEdit    = document.getElementById('gls-hdr-edit');
+        var hdrSubmit  = document.getElementById('gls-hdr-submit');
+        var hdrNewTerm = document.getElementById('gls-hdr-new-term');
+        var container  = document.getElementById('gls-right-content');
+        if (!container) return;
+
+        /* Edit: unlock fields and swap to Submit */
+        if (hdrEdit) {
+            hdrEdit.addEventListener('click', function () {
+                if (hdrEdit.disabled) return;
+                container.querySelectorAll('.gls-user-field').forEach(function (f) {
+                    f.readOnly = false;
+                });
+                hdrEdit.style.display = 'none';
+                if (hdrSubmit) { hdrSubmit.style.display = ''; hdrSubmit.disabled = false; }
+                /* focus first editable field */
+                var first = container.querySelector('.gls-user-field');
+                if (first) first.focus();
+            });
+        }
+
+        /* Submit Changes */
+        if (hdrSubmit) {
+            hdrSubmit.addEventListener('click', function () {
+                if (hdrSubmit.disabled) return;
+                var isNew = !!container.querySelector('.gls-new-mode');
+                saveDraft(container, isNew);
+            });
+        }
+
+        /* New Term */
+        if (hdrNewTerm) {
+            hdrNewTerm.addEventListener('click', function () {
+                loadNewTermCard(container);
+            });
+        }
+    }
+
     /* ── Init ──────────────────────────────────────────────── */
     function init(context) {
         var root = context || document;
@@ -622,6 +674,7 @@ var GlossaryApp = (function () {
         bindThemes(root);
         bindRightPanel();
         initSearch();
+        initHeaderBtns();
     }
 
     return {

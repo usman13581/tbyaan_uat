@@ -63,7 +63,7 @@
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 13px 16px 13px 14px;
+    padding: 12px 16px 12px 14px;
     background: none;
     border: none;
     border-left: 3px solid transparent;
@@ -72,23 +72,25 @@
     font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
     transition: background .15s, border-color .15s;
 }
-.gls-topic-btn:hover   { background: #eef2fa; border-left-color: #d1d5db; }
-.gls-topic-btn.is-open { background: #f3f4f6; border-left-color: #4b5563; }
+.gls-topic-btn:hover   { background: #eef2fa; border-left-color: #93c5fd; }
+.gls-topic-btn.is-open { background: #eff6ff; border-left-color: #3b82f6; }
 
 .gls-topic-arrow {
-    font-size: 16px; color: #1f2937; font-weight: 700;
+    font-size: 15px; color: #9ca3af; font-weight: 700;
     transition: transform .22s ease, color .15s;
-    flex-shrink: 0; margin-top: 2px; display: inline-block; line-height: 1;
+    flex-shrink: 0; margin-top: 3px; display: inline-block; line-height: 1;
 }
-.gls-topic-btn.is-open .gls-topic-arrow { transform: rotate(90deg); color: #4b5563; }
+.gls-topic-btn:hover   .gls-topic-arrow { color: #6b7280; }
+.gls-topic-btn.is-open .gls-topic-arrow { transform: rotate(90deg); color: #3b82f6; }
 
-.gls-topic-titles { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.gls-topic-en     { font-size: 13.5px; font-weight: 700; color: #111827; line-height: 1.35; }
-.gls-topic-btn.is-open .gls-topic-en { color: #111827; }
-.gls-topic-ar     { font-size: 12.5px; font-weight: 500; color: #1f2937; direction: rtl; text-align: right; line-height: 1.3; }
+.gls-topic-titles { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.gls-topic-en     { font-size: 13px; font-weight: 700; color: #1e3a5f; line-height: 1.35; letter-spacing: .01em; }
+.gls-topic-btn.is-open .gls-topic-en { color: #1d4ed8; }
+.gls-topic-ar     { font-size: 12px; font-weight: 500; color: #6b7280; direction: rtl; text-align: right; line-height: 1.3; }
+.gls-topic-btn.is-open .gls-topic-ar { color: #3b82f6; }
 
 /* ── 6. THEME LIST ──────────────────────────────────────── */
-.gls-theme-list         { display: none; background: #f1f5fb; border-top: 1px solid #e2e8f2; padding: 6px 0 10px; }
+.gls-theme-list         { display: none; background: #f8faff; border-top: 1px solid #dbeafe; padding: 4px 0 8px; }
 .gls-theme-list.is-open { display: block; }
 
 /* ── 7. THEME BUTTON ────────────────────────────────────── */
@@ -97,7 +99,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 9px 16px 9px 36px;
+    padding: 8px 16px 8px 32px;
     background: none;
     border: none;
     border-left: 3px solid transparent;
@@ -107,16 +109,15 @@
     transition: background .12s, border-color .12s;
     position: relative;
 }
-.gls-theme-btn::before {
-    content: none;
-}
-.gls-theme-btn:hover             { background: #e4ecf8; border-left-color: #d1d5db; }
-.gls-theme-btn.is-active         { background: #f3f4f6; border-left-color: #4b5563; }
+.gls-theme-btn::before { content: none; }
+.gls-theme-btn:hover   { background: #eff6ff; border-left-color: #93c5fd; }
+.gls-theme-btn.is-active { background: #dbeafe; border-left-color: #2563eb; }
 
-.gls-theme-en { font-size: 12.5px; font-weight: 600; color: #111827; line-height: 1.35; }
-.gls-theme-btn.is-active .gls-theme-en { color: #111827; font-weight: 700; }
-.gls-theme-ar { font-size: 11.5px; font-weight: 400; color: #1f2937; direction: rtl; text-align: right; line-height: 1.3; }
-.gls-theme-btn.is-active .gls-theme-ar { color: #6b7280; }
+.gls-theme-en { font-size: 12px; font-weight: 600; color: #374151; line-height: 1.4; }
+.gls-theme-btn:hover   .gls-theme-en { color: #1d4ed8; }
+.gls-theme-btn.is-active .gls-theme-en { color: #1d4ed8; font-weight: 700; }
+.gls-theme-ar { font-size: 11px; font-weight: 400; color: #9ca3af; direction: rtl; text-align: right; line-height: 1.3; }
+.gls-theme-btn.is-active .gls-theme-ar { color: #3b82f6; }
 
 /* ── 8. RIGHT PANEL ─────────────────────────────────────── */
 .gls-right-panel {
@@ -226,7 +227,7 @@
 /* ── 18. SLIDER NAV ─────────────────────────────────────── */
 .gls-slider-nav {
     display: flex;
-    justify-content: flex-start;
+    justify-content: flex-end;
     align-items: center;
     padding: 12px 20px 14px;
     gap: 10px;
@@ -235,12 +236,6 @@
     flex-shrink: 0;
 }
 
-.gls-right-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
 
 .gls-nav-btn {
     display: inline-flex;
@@ -310,6 +305,23 @@
     background: #f3f4f6 !important;
     color: #6b7280 !important;
     cursor: default;
+}
+
+/* ── 20b2. USER FIELD — view mode (readonly) ────────────── */
+.gls-user-field[readonly] {
+    background: #f9fafb !important;
+    border-color: #e9ecef !important;
+    color: #374151;
+    cursor: default;
+}
+.gls-user-field[readonly]:hover {
+    background: #f9fafb !important;
+    border-color: #e9ecef !important;
+}
+.gls-user-field[readonly]:focus {
+    border-color: #e9ecef !important;
+    box-shadow: none !important;
+    outline: none;
 }
 
 /* ── 20c. REQUIRED MARKER ───────────────────────────────── */
@@ -477,6 +489,7 @@
     white-space: nowrap;
 }
 .gls-search-btn:hover { background: #374151; }
+.gls-search-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 .gls-search-clear-btn {
     padding: 9px 16px;
