@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION SC_EDP.F_BUSINESS_GLOSSARY_TREE
+CREATE OR REPLACE FUNCTION SC_QAWS.F_BUSINESS_GLOSSARY_TREE
     RETURN CLOB
 IS
     l_html      CLOB;
@@ -17,10 +17,18 @@ IS
                glossary_name,     glossary_name_ar,
                topic_name,        topic_name_ar,
                theme_name,        theme_name_ar
-          FROM sc_edp.business_glossary
+          FROM sc_qaws.business_glossary
          WHERE "Axon Viewing" = 'Public'
            AND glossary_name != 'National Standards for Statistical Data (NSSD)'
-         ORDER BY glossary_name, topic_name, theme_name;
+         ORDER BY UPPER(TRIM(glossary_name)) NULLS LAST,
+                  CASE WHEN topic_name IS NULL                  THEN 'ZZZZ'
+                       WHEN UPPER(TRIM(topic_name)) = 'OTHERS' THEN 'ZZZZ'
+                       ELSE UPPER(TRIM(topic_name))
+                  END,
+                  CASE WHEN theme_name IS NULL                  THEN 'ZZZZ'
+                       WHEN UPPER(TRIM(theme_name)) = 'GENERIC' THEN 'ZZZZ'
+                       ELSE UPPER(TRIM(theme_name))
+                  END;
 
     r c%ROWTYPE;
 
@@ -106,14 +114,15 @@ BEGIN
     IF l_has_rows THEN
         DBMS_LOB.APPEND(l_html, TO_CLOB(
                '<div class="gls-tree-wrap">'
-            ||   '<div class="gls-header">'
-            ||     '<div class="gls-title-main">'
-            ||       apex_escape.html(NVL(l_gname,'Business Glossary'))
-            ||     '</div>'
-            ||     CASE WHEN l_gname_ar IS NOT NULL THEN
-                         '<div class="gls-title-main-ar" dir="rtl">'
-                      || apex_escape.html(l_gname_ar) || '</div>'
-                   ELSE '' END
+            ||   '<div class="gls-page-title">'
+            ||     '<div class="gls-title-main">Business Glossary</div>'
+            ||     '<div class="gls-title-main-ar" dir="rtl">&#1575;&#1604;&#1605;&#1587;&#1585;&#1583; &#1575;&#1604;&#1578;&#1580;&#1575;&#1585;&#1610;</div>'
+            ||   '</div>'
+            ||   '<div class="gls-search-bar">'
+            ||     '<input type="text" id="gls-search-input" class="gls-search-input"'
+            ||       ' placeholder="Search by term name, definition or code..." />'
+            ||     '<button type="button" id="gls-search-btn" class="gls-search-btn">&#128269; Search</button>'
+            ||     '<button type="button" id="gls-search-clear" class="gls-search-clear-btn" style="display:none">&#10005; Clear</button>'
             ||   '</div>'
             ||   '<div class="gls-body">'
             ||     '<div class="gls-left-panel">'

@@ -1,0 +1,3 @@
+-- NOT USED — drafts are saved directly into sc_qaws.glossary
+-- with ispublic=0 and status=DRAFT
+-- This file is kept only for reference and should NOT be run.

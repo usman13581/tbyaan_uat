@@ -1,0 +1,209 @@
+/* ============================================================
+   Access Matrix Groups - Page Level CSS
+   Page: P275
+   ============================================================ */
+
+/* --- Layout: 4 columns side by side --- */
+.amg-wrapper {
+  display: flex;
+  gap: 16px;
+  padding: 16px 16px 0;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+
+.amg-region {
+  flex: 1 1 0;
+  min-width: 0;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Region Header --- */
+.amg-region-header {
+  background: #1a5276;
+  color: #ffffff;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.amg-badge {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Locked state (regions 2 & 3 before parent selected) --- */
+.amg-region.is-locked .amg-region-header {
+  background: #7f8c8d;
+}
+
+.amg-region.is-locked .amg-list-container {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.amg-lock-msg {
+  display: none;
+  text-align: center;
+  padding: 10px 8px;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.amg-region.is-locked .amg-lock-msg {
+  display: block;
+}
+
+/* --- Scrollable list container --- */
+.amg-list-container {
+  overflow-y: auto;
+  max-height: 380px;
+  padding: 4px 0;
+}
+
+/* --- List --- */
+.amg-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.amg-item {
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f4f4f4;
+  border-left: 3px solid transparent;
+  transition: background 0.12s, border-left-color 0.12s;
+}
+
+.amg-item:last-child {
+  border-bottom: none;
+}
+
+.amg-item:hover {
+  background: #eaf4fb;
+  border-left-color: #5dade2;
+}
+
+.amg-item.selected {
+  background: #d4e6f1;
+  border-left-color: #1a5276;
+}
+
+/* "No X Assigned" rows — subtle style */
+.amg-item.amg-no-assign .amg-item-en {
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.amg-item-en {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.amg-item-ar {
+  display: block;
+  font-size: 12px;
+  color: #95a5a6;
+  direction: rtl;
+  text-align: right;
+  margin-top: 2px;
+}
+
+/* --- Group Code bar --- */
+.amg-code-bar {
+  margin: 16px 16px 0;
+  padding: 12px 16px;
+  background: #f4f6f7;
+  border: 1px dashed #aab7b8;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.amg-code-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a5276;
+  white-space: nowrap;
+}
+
+.amg-code-value {
+  font-size: 15px;
+  font-family: monospace;
+  color: #117a65;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  flex: 1;
+}
+
+.amg-code-value.is-empty {
+  color: #bdc3c7;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 13px;
+}
+
+/* --- Action Buttons --- */
+.amg-actions {
+  display: flex;
+  gap: 10px;
+  margin: 12px 16px 20px;
+}
+
+.amg-btn {
+  padding: 8px 22px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.2s;
+}
+
+.amg-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.amg-btn-primary {
+  background: #1a5276;
+  color: #ffffff;
+}
+
+.amg-btn-secondary {
+  background: #aab7b8;
+  color: #ffffff;
+}
+
+.amg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Responsive --- */
+@media (max-width: 900px) {
+  .amg-wrapper { flex-wrap: wrap; }
+  .amg-region  { flex: 1 1 45%; }
+}
+
+@media (max-width: 560px) {
+  .amg-region  { flex: 1 1 100%; }
+}

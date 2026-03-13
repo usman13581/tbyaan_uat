@@ -10,7 +10,6 @@
     font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
     font-size: 15px;
     color: #1f2937;
-    padding: 16px;
 }
 
 /* ── 2. HEADER ──────────────────────────────────────────── */
@@ -35,7 +34,7 @@
     display: grid;
     grid-template-columns: 300px 1fr;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    border-radius: 0 0 12px 12px;
     overflow: hidden;
     height: 680px;               /* fixed — never changes */
     box-shadow: 0 2px 12px rgba(0,0,0,.06);
@@ -236,8 +235,11 @@
     flex-shrink: 0;
 }
 
-.gls-new-term {
+.gls-right-actions {
     margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .gls-nav-btn {
@@ -303,7 +305,61 @@
 }
 @keyframes gls-spin { to { transform: rotate(360deg); } }
 
-/* ── 20b. NEW TERM BUTTON & SAVE ───────────────────────── */
+/* ── 20b. READONLY INPUT ────────────────────────────────── */
+.gls-readonly {
+    background: #f3f4f6 !important;
+    color: #6b7280 !important;
+    cursor: default;
+}
+
+/* ── 20c. REQUIRED MARKER ───────────────────────────────── */
+.gls-req { color: #ef4444; margin-left: 2px; }
+
+/* ── 20d. VALIDATION ERRORS ─────────────────────────────── */
+.gls-val-errors {
+    margin: 0 20px 8px;
+    padding: 10px 14px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    color: #b91c1c;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* ── 20e. SUCCESS MESSAGE ───────────────────────────────── */
+.gls-success-msg {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 60px 40px;
+    text-align: center;
+}
+.gls-success-icon {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: #dcfce7;
+    color: #16a34a;
+    font-size: 26px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+}
+.gls-success-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+}
+.gls-success-text {
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.7;
+    max-width: 420px;
+}
+
+/* ── 20f. NEW TERM BUTTON & SAVE ────────────────────────── */
 .gls-btn-save {
     background: #111827;
     color: #ffffff;
@@ -314,6 +370,19 @@
     border-color: #374151;
     color: #ffffff;
     box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+/* ── 20c. SUBMIT CHANGES BUTTON ─────────────────────────── */
+.gls-btn-submit {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+.gls-btn-submit:hover:not(:disabled) {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(37,99,235,.3);
 }
 
 .gls-new-term-label {
@@ -337,7 +406,145 @@
 #gls-right-content > .apex-error,
 #gls-right-content > p:first-child { display: none !important; }
 
-/* ── 23. RESPONSIVE ─────────────────────────────────────── */
+/* ── 23. PAGE TITLE BAR ─────────────────────────────────── */
+.gls-page-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+}
+
+/* ── 23b. SEARCH BAR — attached to tree below ───────────── */
+.gls-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-radius: 12px 12px 0 0;
+    margin-bottom: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+}
+
+.gls-search-input,
+.gls-search-select {
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 14px;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    color: #111827;
+    background: #fafbfd;
+    box-sizing: border-box;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.gls-search-input {
+    flex: 1;
+    min-width: 200px;
+}
+.gls-search-select {
+    min-width: 180px;
+    cursor: pointer;
+}
+.gls-search-input:focus,
+.gls-search-select:focus {
+    border-color: #6b7280;
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    background: #ffffff;
+    outline: none;
+}
+
+.gls-search-btn {
+    padding: 9px 22px;
+    background: #111827;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    transition: background .15s;
+    white-space: nowrap;
+}
+.gls-search-btn:hover { background: #374151; }
+
+.gls-search-clear-btn {
+    padding: 9px 16px;
+    background: #ffffff;
+    color: #6b7280;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+}
+.gls-search-clear-btn:hover { background: #f9fafb; border-color: #6b7280; }
+
+/* ── 24. SEARCH RESULTS ──────────────────────────────────── */
+.gls-search-results {
+    padding: 10px 12px;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.gls-result-item {
+    padding: 11px 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: #ffffff;
+    transition: background .12s, border-color .12s;
+}
+.gls-result-item:hover { background: #f0f7ff; border-color: #93c5fd; }
+
+.gls-result-names {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+.gls-result-en { font-size: 14px; font-weight: 600; color: #111827; }
+.gls-result-ar { font-size: 13px; color: #4b5563; direction: rtl; }
+
+.gls-result-meta {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+}
+.gls-result-code {
+    font-size: 11px;
+    font-weight: 700;
+    background: #f3f4f6;
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: #374151;
+}
+.gls-result-path { font-size: 11px; color: #6b7280; }
+
+.gls-result-def {
+    font-size: 12px;
+    color: #4b5563;
+    line-height: 1.55;
+}
+
+/* ── 25. RESPONSIVE ─────────────────────────────────────── */
 @media (max-width: 1100px) { .gls-body { grid-template-columns: 260px 1fr; } }
 @media (max-width: 900px)  {
     .gls-body { grid-template-columns: 220px 1fr; }
