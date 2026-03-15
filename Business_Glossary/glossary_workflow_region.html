@@ -1,0 +1,44 @@
+<!--
+  ================================================================
+  GLOSSARY WORKFLOW REVIEW CARD  –  APEX Region Source
+  ================================================================
+  WHERE TO PASTE THIS:
+    APEX Page > Regions > [New Region]
+      Type:   Static Content
+      Source: paste the <div> below
+
+  data-workflow-id is set to &P76_WORKFLOW_PROCESS_ID. — the workflow
+  process PK available on page 76. The GET_WF_TERM_JSON callback
+  resolves it to PROCESSES_LANDING_ID via:
+    SELECT WORKFLOW_TRANSACTION_VALUE FROM WF_T_PROCESSES
+     WHERE WORKFLOW_PROCESS_ID = :x01
+
+  ALSO REQUIRED ON THE SAME PAGE:
+    1. JS File   → Upload glossary.js (or reference its URL)
+    2. CSS Inline → Paste contents of glossary_workflow.css into
+                    Page > CSS > Inline
+    3. APEX Ajax Callbacks (Shared Components > Dynamic Actions):
+         • GET_WF_TERM_JSON    (paste apex_callback_GET_WF_TERM_JSON.sql)
+         • SAVE_WF_TERM_JSON   (paste apex_callback_SAVE_WF_TERM_JSON.sql)
+    4. Execute when Page Loads:
+         GlossaryWFApp.init();
+
+  FINAL APPROVAL STEP:
+    In the workflow process that runs on final approval, add a
+    PL/SQL process step:
+         BEGIN
+             SC_QAWS.P_APPROVE_GLOSSARY_TERM(
+                 p_landing_id => :PROCESSES_LANDING_ID
+             );
+         END;
+    (compile P_APPROVE_GLOSSARY_TERM.sql first)
+  ================================================================
+-->
+
+<div id="gls-wf-content" data-workflow-id="&P76_WORKFLOW_PROCESS_ID.">
+    <!-- GlossaryWFApp.init() will replace this with the card -->
+    <div class="gls-wf-loading">
+        <div class="gls-wf-spinner"></div>
+        <span>Loading request details&hellip;</span>
+    </div>
+</div>

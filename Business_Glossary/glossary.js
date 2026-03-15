@@ -54,6 +54,22 @@ var GlossaryApp = (function () {
                     '</div>' +
                 '</div>' +
             '</div>' +
+            '<div class="gls-two-col gls-submit-fields" style="margin-top:12px;display:none">' +
+                '<div class="gls-field-group">' +
+                    '<label class="gls-label">Justification <span class="gls-req">*</span></label>' +
+                    '<textarea id="gls-justification" class="gls-textarea gls-user-field" name="f12" readonly></textarea>' +
+                '</div>' +
+                '<div class="gls-field-group">' +
+                    '<label class="gls-label">Use <span class="gls-req">*</span></label>' +
+                    '<select id="gls-use" class="gls-input" name="f13">' +
+                        '<option value="">-- Select Use --</option>' +
+                        '<option value="Data Collection">Data Collection</option>' +
+                        '<option value="Data Analysis and Dissemination">Data Analysis and Dissemination</option>' +
+                        '<option value="Policy and Regulation">Policy and Regulation</option>' +
+                        '<option value="Other">Other</option>' +
+                    '</select>' +
+                '</div>' +
+            '</div>' +
         '</div>' +
         '<div class="gls-slider-nav">' +
             '<button type="button" class="gls-nav-btn gls-prev">&#8592; Previous</button>' +
@@ -201,6 +217,18 @@ var GlossaryApp = (function () {
                             '<div class="gls-field-group"><label class="gls-label gls-lbl-ar">&#1575;&#1604;&#1578;&#1593;&#1585;&#1610;&#1601;</label>' +
                                 '<textarea id="gls-def-ar" class="gls-textarea gls-rtl" dir="rtl"></textarea></div>' +
                         '</div>' +
+                        '<div class="gls-two-col" style="margin-top:12px">' +
+                            '<div class="gls-field-group"><label class="gls-label">Justification <span class="gls-req">*</span></label>' +
+                                '<textarea id="gls-justification" class="gls-textarea" placeholder="Why is this term needed?"></textarea></div>' +
+                            '<div class="gls-field-group"><label class="gls-label">Use <span class="gls-req">*</span></label>' +
+                                '<select id="gls-use" class="gls-input">' +
+                                    '<option value="">-- Select Use --</option>' +
+                                    '<option value="Data Collection">Data Collection</option>' +
+                                    '<option value="Data Analysis and Dissemination">Data Analysis and Dissemination</option>' +
+                                    '<option value="Policy and Regulation">Policy and Regulation</option>' +
+                                    '<option value="Other">Other</option>' +
+                                '</select></div>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="gls-slider-nav">' +
@@ -276,18 +304,22 @@ var GlossaryApp = (function () {
             parent_ref: val('gls-parentref'),
             dataset_en: val('gls-dataset-en'),
             dataset_ar: val('gls-dataset-ar'),
-            def_en:     val('gls-def-en'),
-            def_ar:     val('gls-def-ar'),
-            source:     val('gls-source')
+            def_en:        val('gls-def-en'),
+            def_ar:        val('gls-def-ar'),
+            source:        val('gls-source'),
+            justification: val('gls-justification'),
+            use:           val('gls-use')
         };
     }
 
     /* ── Validate card ─────────────────────────────────────── */
     function validateCard(data, isNew) {
         var errors = [];
-        if (!data.name_en)    errors.push('Term Name (EN) is required.');
-        if (!data.def_en)     errors.push('Definition (EN) is required.');
-        if (isNew && !data.parent_ref) errors.push('Parent Ref is required.');
+        if (!data.name_en)        errors.push('Term Name (EN) is required.');
+        if (!data.def_en)         errors.push('Definition (EN) is required.');
+        if (isNew && !data.parent_ref)  errors.push('Parent Ref is required.');
+        if (!data.justification)  errors.push('Justification is required.');
+        if (!data.use)            errors.push('Use is required.');
         return errors;
     }
 
@@ -327,9 +359,11 @@ var GlossaryApp = (function () {
             dataset_ar: data.dataset_ar,
             def_en:     data.def_en,
             def_ar:     data.def_ar,
-            source:     data.source,
-            topic:      curTopic,
-            theme:      curTheme
+            source:        data.source,
+            justification: data.justification,
+            use:           data.use,
+            topic:         curTopic,
+            theme:         curTheme
         };
 
         apex.server.process(
@@ -394,7 +428,7 @@ var GlossaryApp = (function () {
         });
         container.addEventListener('change', function (e) {
             var t = e.target;
-            if (t.tagName === 'SELECT' && t.id === 'gls-parentref') {
+            if (t.tagName === 'SELECT' && (t.id === 'gls-parentref' || t.id === 'gls-use')) {
                 var submitBtn = container.querySelector('.gls-submit-changes');
                 if (submitBtn) submitBtn.disabled = false;
                 isDirty = true;
@@ -643,6 +677,10 @@ var GlossaryApp = (function () {
                 });
                 hdrEdit.style.display = 'none';
                 if (hdrSubmit) { hdrSubmit.style.display = ''; hdrSubmit.disabled = false; }
+                /* show justification + use fields */
+                container.querySelectorAll('.gls-submit-fields').forEach(function (el) {
+                    el.style.display = '';
+                });
                 /* focus first editable field */
                 var first = container.querySelector('.gls-user-field');
                 if (first) first.focus();
@@ -681,5 +719,339 @@ var GlossaryApp = (function () {
         init      : init,
         clearCache: function () { termCache = {}; }
     };
+
+}());
+
+
+/* ============================================================
+   GLOSSARY WORKFLOW REVIEW CARD  –  GlossaryWFApp
+   Renders a term-request card on APEX workflow pages.
+   Reads JSON_VAL from SEC_T_PROCESSES_LANDING and lets the
+   reviewer Edit → Save Changes (updates landing table + glossary).
+
+   APEX page setup:
+     1. Add a Static HTML region with source from
+        glossary_workflow_region.html (set data-landing-id to
+        your page item, e.g. data-landing-id="&P_LANDING_ID.")
+     2. Upload/include glossary.js (this file) on the page
+     3. Paste glossary_workflow.css into the page CSS
+     4. Register APEX callbacks: GET_WF_TERM_JSON, SAVE_WF_TERM_JSON
+     5. In "Execute when Page Loads": GlossaryWFApp.init();
+   ============================================================ */
+
+var GlossaryWFApp = (function () {
+    'use strict';
+
+    var _workflowId = null;  // P76_WORKFLOW_PROCESS_ID (passed to GET callback)
+    var _landingId  = null;  // PROCESSES_LANDING_ID resolved by GET callback
+    var _data       = null;  // last loaded data object
+
+    /* ── HTML template for the review card ─────────────────── */
+    var WF_CARD_HTML =
+        '<div class="gls-wf-card">' +
+
+            /* header: title left, Edit button right */
+            '<div class="gls-wf-header">' +
+                '<h2 class="gls-wf-title" id="gls-wf-title">Loading&hellip;</h2>' +
+                '<button type="button" class="gls-wf-btn gls-wf-edit-btn" id="gls-wf-edit">Edit</button>' +
+            '</div>' +
+
+            /* names row */
+            '<div class="gls-wf-body">' +
+                '<div class="gls-wf-row">' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Term Name (EN)</label>' +
+                        '<input id="gwf-name-en" type="text" class="gls-wf-input gwf-editable" readonly>' +
+                    '</div>' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label gls-wf-lbl-ar">\u0627\u0633\u0645 \u0627\u0644\u0645\u0635\u0637\u0644\u062d</label>' +
+                        '<input id="gwf-name-ar" type="text" class="gls-wf-input gls-wf-rtl gwf-editable" dir="rtl" readonly>' +
+                    '</div>' +
+                '</div>' +
+
+                /* meta row: read-only identifiers */
+                '<div class="gls-wf-row gls-wf-row-3">' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Term Ref</label>' +
+                        '<input id="gwf-termref" type="text" class="gls-wf-input gls-wf-readonly" readonly>' +
+                    '</div>' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Parent Ref</label>' +
+                        '<input id="gwf-parentref" type="text" class="gls-wf-input gls-wf-readonly" readonly>' +
+                    '</div>' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Source</label>' +
+                        '<input id="gwf-source" type="text" class="gls-wf-input gwf-editable" readonly>' +
+                    '</div>' +
+                '</div>' +
+
+                /* definitions */
+                '<div class="gls-wf-row">' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Definition (EN)</label>' +
+                        '<textarea id="gwf-def-en" class="gls-wf-textarea gwf-editable" readonly></textarea>' +
+                    '</div>' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label gls-wf-lbl-ar">\u0627\u0644\u062a\u0639\u0631\u064a\u0641</label>' +
+                        '<textarea id="gwf-def-ar" class="gls-wf-textarea gls-wf-rtl gwf-editable" dir="rtl" readonly></textarea>' +
+                    '</div>' +
+                '</div>' +
+
+                /* justification + use */
+                '<div class="gls-wf-row">' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Justification</label>' +
+                        '<textarea id="gwf-justification" class="gls-wf-textarea gwf-editable" readonly></textarea>' +
+                    '</div>' +
+                    '<div class="gls-wf-field">' +
+                        '<label class="gls-wf-label">Use</label>' +
+                        '<select id="gwf-use" class="gls-wf-input gwf-editable-select" disabled>' +
+                            '<option value="">-- Select Use --</option>' +
+                            '<option value="Data Collection">Data Collection</option>' +
+                            '<option value="Data Analysis and Dissemination">Data Analysis and Dissemination</option>' +
+                            '<option value="Policy and Regulation">Policy and Regulation</option>' +
+                            '<option value="Other">Other</option>' +
+                        '</select>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
+
+            /* error / success message area */
+            '<div id="gls-wf-msg" class="gls-wf-msg" style="display:none"></div>' +
+
+        '</div>';
+
+    /* ── Fill card fields from data object ──────────────────── */
+    function fillCard(wrap, d) {
+        function set(id, val) {
+            var el = wrap.querySelector('#' + id);
+            if (!el) return;
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+                el.value = val || '';
+            } else {
+                el.textContent = val || '';
+            }
+        }
+
+        /* heading */
+        var title = wrap.querySelector('#gls-wf-title');
+        if (title) {
+            title.textContent = (d.request_type === 'UPDATE')
+                ? 'Update Requested in Glossary'
+                : 'New Term Requested in Glossary';
+        }
+
+        set('gwf-name-en',   d.name_en);
+        set('gwf-name-ar',   d.name_ar);
+        set('gwf-termref',   d.term_ref);
+        set('gwf-parentref', d.parent_ref);
+        set('gwf-source',        d.source);
+        set('gwf-def-en',        d.def_en);
+        set('gwf-def-ar',        d.def_ar);
+        set('gwf-justification', d.justification);
+        set('gwf-use',           d.use);
+        set('gwf-subby',     d.submitted_by);
+        set('gwf-subon',     d.submitted_on);
+    }
+
+    /* ── Collect editable field values from card ────────────── */
+    function collectCardData(wrap) {
+        function val(id) {
+            var el = wrap.querySelector('#' + id);
+            return el ? el.value.trim() : '';
+        }
+        return {
+            landing_id:  _landingId,
+            glossary_id: _data ? _data.glossary_id : null,
+            term_ref:    _data ? _data.term_ref    : '',
+            parent_ref:  _data ? _data.parent_ref  : '',
+            name_en:     val('gwf-name-en'),
+            name_ar:     val('gwf-name-ar'),
+            def_en:        val('gwf-def-en'),
+            def_ar:        val('gwf-def-ar'),
+            source:        val('gwf-source'),
+            justification: val('gwf-justification'),
+            use:           val('gwf-use')
+        };
+    }
+
+    /* ── Show inline message ────────────────────────────────── */
+    function showMsg(wrap, type, text) {
+        var el = wrap.querySelector('#gls-wf-msg');
+        if (!el) return;
+        el.className  = 'gls-wf-msg gls-wf-msg-' + type;
+        el.textContent = text;
+        el.style.display = '';
+    }
+
+    function hideMsg(wrap) {
+        var el = wrap.querySelector('#gls-wf-msg');
+        if (el) el.style.display = 'none';
+    }
+
+    /* ── Switch to EDIT mode ────────────────────────────────── */
+    function enterEditMode(wrap) {
+        wrap.querySelectorAll('.gwf-editable').forEach(function (f) {
+            f.readOnly = false;
+        });
+        var btn = wrap.querySelector('#gls-wf-edit');
+        if (btn) {
+            btn.textContent = 'Save Changes';
+            btn.classList.remove('gls-wf-edit-btn');
+            btn.classList.add('gls-wf-save-btn');
+            btn.dataset.mode = 'save';
+        }
+        wrap.querySelectorAll('.gwf-editable-select').forEach(function (f) { f.disabled = false; });
+        wrap.classList.add('gls-wf-editing');
+        hideMsg(wrap);
+        /* focus first editable */
+        var first = wrap.querySelector('.gwf-editable');
+        if (first) first.focus();
+    }
+
+    /* ── Switch back to VIEW mode ───────────────────────────── */
+    function enterViewMode(wrap) {
+        wrap.querySelectorAll('.gwf-editable').forEach(function (f) {
+            f.readOnly = true;
+        });
+        var btn = wrap.querySelector('#gls-wf-edit');
+        if (btn) {
+            btn.textContent = 'Edit';
+            btn.classList.remove('gls-wf-save-btn');
+            btn.classList.add('gls-wf-edit-btn');
+            btn.dataset.mode = 'edit';
+            btn.disabled = false;
+        }
+        wrap.querySelectorAll('.gwf-editable-select').forEach(function (f) { f.disabled = true; });
+        wrap.classList.remove('gls-wf-editing');
+    }
+
+    /* ── Save changes via Ajax ──────────────────────────────── */
+    function saveChanges(wrap) {
+        var payload = collectCardData(wrap);
+
+        if (!payload.name_en) {
+            showMsg(wrap, 'error', 'Term Name (EN) is required.');
+            return;
+        }
+
+        var btn = wrap.querySelector('#gls-wf-edit');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+
+        apex.server.process(
+            'SAVE_WF_TERM_JSON',
+            { x01: JSON.stringify(payload) },
+            {
+                dataType: 'text',
+                success: function (raw) {
+                    var result;
+                    try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
+
+                    if (result.status === 'ok') {
+                        /* update local cache so re-entering edit shows saved values */
+                        _data.name_en      = payload.name_en;
+                        _data.name_ar      = payload.name_ar;
+                        _data.def_en       = payload.def_en;
+                        _data.def_ar       = payload.def_ar;
+                        _data.source       = payload.source;
+                        _data.justification = payload.justification;
+                        _data.use           = payload.use;
+
+                        enterViewMode(wrap);
+                        showMsg(wrap, 'success', '\u2713 Changes saved successfully.');
+                    } else {
+                        if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+                        showMsg(wrap, 'error', result.message || 'Save failed. Please try again.');
+                    }
+                },
+                error: function (xhr) {
+                    if (btn) { btn.disabled = false; btn.textContent = 'Save Changes'; }
+                    showMsg(wrap, 'error', xhr.responseText || 'Network error. Please try again.');
+                }
+            }
+        );
+    }
+
+    /* ── Load & render the card ─────────────────────────────── */
+    function loadCard(wrap, workflowProcessId) {
+        _workflowId = workflowProcessId;
+
+        /* show loading state */
+        wrap.innerHTML =
+            '<div class="gls-wf-loading">' +
+                '<div class="gls-wf-spinner"></div>' +
+                '<span>Loading request details\u2026</span>' +
+            '</div>';
+
+        apex.server.process(
+            'GET_WF_TERM_JSON',
+            { x01: String(workflowProcessId) },
+            {
+                dataType: 'text',
+                success: function (raw) {
+                    var d;
+                    try { d = JSON.parse(raw); } catch (e) {
+                        wrap.innerHTML =
+                            '<div class="gls-wf-error">Failed to parse server response.</div>';
+                        return;
+                    }
+
+                    if (d.status === 'error') {
+                        wrap.innerHTML =
+                            '<div class="gls-wf-error">' + (d.message || 'Error loading data.') + '</div>';
+                        return;
+                    }
+
+                    /* store resolved landing_id returned by callback */
+                    _landingId = d.landing_id;
+                    _data = d;
+
+                    /* render card */
+                    wrap.innerHTML = WF_CARD_HTML;
+                    fillCard(wrap, d);
+
+                    /* bind Edit / Save button */
+                    var btn = wrap.querySelector('#gls-wf-edit');
+                    if (btn) {
+                        btn.dataset.mode = 'edit';
+                        btn.addEventListener('click', function () {
+                            if (btn.dataset.mode === 'edit') {
+                                enterEditMode(wrap);
+                            } else {
+                                saveChanges(wrap);
+                            }
+                        });
+                    }
+                },
+                error: function (xhr) {
+                    wrap.innerHTML =
+                        '<div class="gls-wf-error">' +
+                        (xhr.responseText || 'Failed to load request details.') +
+                        '</div>';
+                }
+            }
+        );
+    }
+
+    /* ── Public init — call from "Execute when Page Loads" ───── */
+    function init() {
+        var wrap = document.getElementById('gls-wf-content');
+        if (!wrap) return;
+
+        /* reads P76_WORKFLOW_PROCESS_ID substituted into data-workflow-id */
+        var wfProcessId = wrap.getAttribute('data-workflow-id');
+        if (!wfProcessId || wfProcessId === '0' || wfProcessId === '') {
+            wrap.innerHTML =
+                '<div class="gls-wf-error">No workflow process ID found. ' +
+                'Ensure data-workflow-id is set to &amp;P76_WORKFLOW_PROCESS_ID. ' +
+                'on #gls-wf-content.</div>';
+            return;
+        }
+
+        loadCard(wrap, wfProcessId);
+    }
+
+    return { init: init };
 
 }());

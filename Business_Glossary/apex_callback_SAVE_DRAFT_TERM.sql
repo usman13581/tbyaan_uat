@@ -26,13 +26,15 @@ DECLARE
     l_sec_class   NUMBER;
 
     -- parsed fields
-    l_name_en    VARCHAR2(4000);
-    l_name_ar    VARCHAR2(4000);
-    l_term_ref   VARCHAR2(200);
-    l_parent_ref VARCHAR2(4000);
-    l_def_en     VARCHAR2(4000);
-    l_def_ar     VARCHAR2(4000);
-    l_source     VARCHAR2(4000);
+    l_name_en       VARCHAR2(4000);
+    l_name_ar       VARCHAR2(4000);
+    l_term_ref      VARCHAR2(200);
+    l_parent_ref    VARCHAR2(4000);
+    l_def_en        VARCHAR2(4000);
+    l_def_ar        VARCHAR2(4000);
+    l_source        VARCHAR2(4000);
+    l_justification VARCHAR2(4000);
+    l_use           VARCHAR2(200);
 
     FUNCTION jstr(p IN VARCHAR2) RETURN VARCHAR2 IS
         l VARCHAR2(32767);
@@ -70,7 +72,9 @@ BEGIN
     l_parent_ref := JSON_VALUE(l_payload, '$.parent_ref');
     l_def_en     := JSON_VALUE(l_payload, '$.def_en');
     l_def_ar     := JSON_VALUE(l_payload, '$.def_ar');
-    l_source     := JSON_VALUE(l_payload, '$.source');
+    l_source        := JSON_VALUE(l_payload, '$.source');
+    l_justification := JSON_VALUE(l_payload, '$.justification');
+    l_use           := JSON_VALUE(l_payload, '$.use');
 
     IF l_name_en IS NULL THEN
         HTP.P('{"status":"error","message":"Term Name (EN) is required."}');
@@ -139,8 +143,10 @@ BEGIN
         '"def_en":'       || jstr(l_def_en)       || ',' ||
         '"def_ar":'       || jstr(l_def_ar)       || ',' ||
         '"parent_ref":'   || jstr(l_parent_ref)   || ',' ||
-        '"source":'       || jstr(l_source)        || ',' ||
-        '"status":3,'     ||
+        '"source":'        || jstr(l_source)         || ',' ||
+        '"justification":' || jstr(l_justification)  || ',' ||
+        '"use":'           || jstr(l_use)            || ',' ||
+        '"status":3,'                                        ||
         '"submitted_by":' || jstr(apex_application.g_user) || ',' ||
         '"submitted_on":' || jstr(TO_CHAR(SYSDATE,'YYYY-MM-DD HH24:MI:SS')) ||
         '}';
