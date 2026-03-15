@@ -79,6 +79,7 @@ var GlossaryApp = (function () {
                 '<span class="gls-total">1</span>' +
             '</div>' +
             '<button type="button" class="gls-nav-btn gls-next">Next &#8594;</button>' +
+            '<button type="button" class="gls-nav-btn gls-last">Last &#8649;</button>' +
         '</div>';
 
     /* ── Inject JSON data into fixed card ─────────────────── */
@@ -109,8 +110,10 @@ var GlossaryApp = (function () {
 
         var prev = container.querySelector('.gls-prev');
         var next = container.querySelector('.gls-next');
+        var last = container.querySelector('.gls-last');
         if (prev) prev.disabled = (d.seq <= 1);
         if (next) next.disabled = (d.seq >= d.total);
+        if (last) last.disabled = (d.seq >= d.total);
 
         curSeq   = d.seq;
         curTotal = d.total;
@@ -446,6 +449,10 @@ var GlossaryApp = (function () {
                 loadTerm(curTopic, curTheme, curSeq + 1);
                 return;
             }
+            if (t.classList.contains('gls-last') && !t.disabled && curSeq < curTotal) {
+                loadTerm(curTopic, curTheme, curTotal);
+                return;
+            }
 
             /* open blank new term card */
             if (t.classList.contains('gls-new-term')) {
@@ -492,14 +499,16 @@ var GlossaryApp = (function () {
 
     /* ── Themes ────────────────────────────────────────────── */
     function bindThemes(root) {
-        root.querySelectorAll('.gls-theme-btn').forEach(function (btn) {
-            if (btn.dataset.bound === 'Y') return;
-            btn.dataset.bound = 'Y';
-            btn.addEventListener('click', function () {
-                root.querySelectorAll('.gls-theme-btn').forEach(function (b) { b.classList.remove('is-active'); });
-                btn.classList.add('is-active');
-                loadTerm(btn.getAttribute('data-topic'), btn.getAttribute('data-theme'), 1);
-            });
+        var wrap = root.querySelector('.gls-tree-wrap') || root;
+        if (wrap.dataset.themesBound === 'Y') return;
+        wrap.dataset.themesBound = 'Y';
+        /* event delegation — works even if tree renders after init */
+        wrap.addEventListener('click', function (e) {
+            var btn = e.target.closest('.gls-theme-btn');
+            if (!btn) return;
+            wrap.querySelectorAll('.gls-theme-btn').forEach(function (b) { b.classList.remove('is-active'); });
+            btn.classList.add('is-active');
+            loadTerm(btn.getAttribute('data-topic'), btn.getAttribute('data-theme'), 1);
         });
     }
 
@@ -584,7 +593,8 @@ var GlossaryApp = (function () {
                 html +=
                     '<div class="gls-result-item"' +
                         ' data-topic="' + escAttr(r.topic) + '"' +
-                        ' data-theme="' + escAttr(r.theme) + '">' +
+                        ' data-theme="' + escAttr(r.theme) + '"' +
+                        ' data-seq="'   + (r.seq || 1)     + '">' +
                         '<div class="gls-result-names">' +
                             '<span class="gls-result-en">' + escHtml(r.name_en) + '</span>' +
                             (r.name_ar
@@ -608,6 +618,7 @@ var GlossaryApp = (function () {
                 item.addEventListener('click', function () {
                     var topic = item.getAttribute('data-topic');
                     var theme = item.getAttribute('data-theme');
+                    var seq   = parseInt(item.getAttribute('data-seq'), 10) || 1;
                     var root  = document.querySelector('.gls-tree-wrap') || document;
 
                     /* deactivate all themes */
@@ -631,18 +642,20 @@ var GlossaryApp = (function () {
                         }
                     });
 
-                    loadTerm(topic, theme, 1);
+                    loadTerm(topic, theme, seq);
                 });
             });
         }
 
         searchBtn.addEventListener('click', doSearch);
+        /* capture=true ensures we run before APEX's page-submit handler */
         searchInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
+                e.stopImmediatePropagation();
                 doSearch();
             }
-        });
+        }, true);
 
         if (clearBtn) {
             clearBtn.addEventListener('click', function () {
@@ -710,6 +723,7 @@ var GlossaryApp = (function () {
         if (!root.querySelector('.gls-tree-wrap')) return;
         bindTopics(root);
         bindThemes(root);
+        openFirstTopic(root);
         bindRightPanel();
         initSearch();
         initHeaderBtns();

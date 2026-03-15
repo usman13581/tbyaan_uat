@@ -23,6 +23,8 @@ DECLARE
     l_def_en     VARCHAR2(4000);
     l_def_ar     VARCHAR2(4000);
     l_source        VARCHAR2(4000);
+    l_dataset_en    VARCHAR2(4000);
+    l_dataset_ar    VARCHAR2(4000);
     l_justification VARCHAR2(4000);
     l_use           VARCHAR2(200);
 
@@ -86,6 +88,8 @@ BEGIN
     l_def_en     := JSON_VALUE(l_payload, '$.def_en');
     l_def_ar     := JSON_VALUE(l_payload, '$.def_ar');
     l_source        := JSON_VALUE(l_payload, '$.source');
+    l_dataset_en    := JSON_VALUE(l_payload, '$.dataset_en');
+    l_dataset_ar    := JSON_VALUE(l_payload, '$.dataset_ar');
     l_justification := JSON_VALUE(l_payload, '$.justification');
     l_use           := JSON_VALUE(l_payload, '$.use');
 
@@ -119,6 +123,8 @@ BEGIN
         '"def_ar":'        || jstr(l_def_ar)                  || ','   ||
         '"parent_ref":'    || jstr(l_parent_ref)              || ','   ||
         '"source":'        || jstr(l_source)                  || ','   ||
+        '"dataset_en":'    || jstr(l_dataset_en)              || ','   ||
+        '"dataset_ar":'    || jstr(l_dataset_ar)              || ','   ||
         '"justification":' || jstr(l_justification)           || ','   ||
         '"use":'           || jstr(l_use)                     || ','   ||
         '"status":3,'                                                   ||
@@ -143,9 +149,13 @@ BEGIN
      WHERE id = l_gls_id;
 
     -- ── upsert custom_field rows ───────────────────────────────
-    upsert_cf(l_gls_id, 120, l_name_ar);   -- Arabic name
-    upsert_cf(l_gls_id, 121, l_def_ar);    -- Arabic definition
-    upsert_cf(l_gls_id, 146, l_source);    -- Source
+    upsert_cf(l_gls_id, 120, l_name_ar);        -- Arabic name
+    upsert_cf(l_gls_id, 121, l_def_ar);         -- Arabic definition
+    upsert_cf(l_gls_id, 146, l_source);         -- Source
+    upsert_cf(l_gls_id, 147, l_dataset_en);     -- Dataset EN
+    upsert_cf(l_gls_id, 148, l_dataset_ar);     -- Dataset AR
+    upsert_cf(l_gls_id, 149, l_justification);  -- Justification
+    upsert_cf(l_gls_id, 150, l_use);            -- Use
 
     COMMIT;
 

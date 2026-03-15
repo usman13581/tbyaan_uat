@@ -1,7 +1,9 @@
 -- ============================================================
 -- APEX Ajax Callback:  SAVE_DRAFT_TERM
 -- Inserts draft term directly into sc_qaws.glossary (ispublic=0)
--- and sc_qaws.custom_field for AR name (120), AR def (121), source (146)
+-- and sc_qaws.custom_field for:
+--   120=name_ar, 121=def_ar, 146=source,
+--   147=dataset_en, 148=dataset_ar, 149=justification, 150=use
 -- Input:  x01 = JSON string from JS
 -- Output: {"status":"ok","id":NNN} or {"status":"error","message":"..."}
 -- ============================================================
@@ -33,6 +35,8 @@ DECLARE
     l_def_en        VARCHAR2(4000);
     l_def_ar        VARCHAR2(4000);
     l_source        VARCHAR2(4000);
+    l_dataset_en    VARCHAR2(4000);
+    l_dataset_ar    VARCHAR2(4000);
     l_justification VARCHAR2(4000);
     l_use           VARCHAR2(200);
 
@@ -73,6 +77,8 @@ BEGIN
     l_def_en     := JSON_VALUE(l_payload, '$.def_en');
     l_def_ar     := JSON_VALUE(l_payload, '$.def_ar');
     l_source        := JSON_VALUE(l_payload, '$.source');
+    l_dataset_en    := JSON_VALUE(l_payload, '$.dataset_en');
+    l_dataset_ar    := JSON_VALUE(l_payload, '$.dataset_ar');
     l_justification := JSON_VALUE(l_payload, '$.justification');
     l_use           := JSON_VALUE(l_payload, '$.use');
 
@@ -133,6 +139,18 @@ BEGIN
     -- ── insert source (custom field 146) ────────────────────
     ins_cf(l_new_id, 146, l_source);
 
+    -- ── insert dataset EN (custom field 147) ─────────────────
+    ins_cf(l_new_id, 147, l_dataset_en);
+
+    -- ── insert dataset AR (custom field 148) ─────────────────
+    ins_cf(l_new_id, 148, l_dataset_ar);
+
+    -- ── insert justification (custom field 149) ──────────────
+    ins_cf(l_new_id, 149, l_justification);
+
+    -- ── insert use (custom field 150) ────────────────────────
+    ins_cf(l_new_id, 150, l_use);
+
     -- ── build workflow review JSON ───────────────────────────
     l_review_json :=
         '{' ||
@@ -144,6 +162,8 @@ BEGIN
         '"def_ar":'       || jstr(l_def_ar)       || ',' ||
         '"parent_ref":'   || jstr(l_parent_ref)   || ',' ||
         '"source":'        || jstr(l_source)         || ',' ||
+        '"dataset_en":'    || jstr(l_dataset_en)     || ',' ||
+        '"dataset_ar":'    || jstr(l_dataset_ar)     || ',' ||
         '"justification":' || jstr(l_justification)  || ',' ||
         '"use":'           || jstr(l_use)            || ',' ||
         '"status":3,'                                        ||

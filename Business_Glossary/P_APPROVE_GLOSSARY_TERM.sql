@@ -27,13 +27,17 @@ AS
     l_json       CLOB;
 
     -- from JSON
-    l_gls_id     NUMBER;   -- draft row ID (inserted by SAVE_DRAFT_TERM)
-    l_term_ref   VARCHAR2(200);
-    l_name_en    VARCHAR2(4000);
-    l_name_ar    VARCHAR2(4000);
-    l_def_en     VARCHAR2(4000);
-    l_def_ar     VARCHAR2(4000);
-    l_source     VARCHAR2(4000);
+    l_gls_id        NUMBER;   -- draft row ID (inserted by SAVE_DRAFT_TERM)
+    l_term_ref      VARCHAR2(200);
+    l_name_en       VARCHAR2(4000);
+    l_name_ar       VARCHAR2(4000);
+    l_def_en        VARCHAR2(4000);
+    l_def_ar        VARCHAR2(4000);
+    l_source        VARCHAR2(4000);
+    l_dataset_en    VARCHAR2(4000);
+    l_dataset_ar    VARCHAR2(4000);
+    l_justification VARCHAR2(4000);
+    l_use           VARCHAR2(200);
 
     -- for UPDATE path: original active term
     l_orig_id    NUMBER;
@@ -77,13 +81,17 @@ BEGIN
       FROM SEC_T_PROCESSES_LANDING
      WHERE PROCESSES_LANDING_ID = l_landing_id;
 
-    l_gls_id   := TO_NUMBER(JSON_VALUE(l_json, '$.glossary_id'));
-    l_term_ref := JSON_VALUE(l_json, '$.term_ref');
-    l_name_en  := JSON_VALUE(l_json, '$.name_en');
-    l_name_ar  := JSON_VALUE(l_json, '$.name_ar');
-    l_def_en   := JSON_VALUE(l_json, '$.def_en');
-    l_def_ar   := JSON_VALUE(l_json, '$.def_ar');
-    l_source   := JSON_VALUE(l_json, '$.source');
+    l_gls_id        := TO_NUMBER(JSON_VALUE(l_json, '$.glossary_id'));
+    l_term_ref      := JSON_VALUE(l_json, '$.term_ref');
+    l_name_en       := JSON_VALUE(l_json, '$.name_en');
+    l_name_ar       := JSON_VALUE(l_json, '$.name_ar');
+    l_def_en        := JSON_VALUE(l_json, '$.def_en');
+    l_def_ar        := JSON_VALUE(l_json, '$.def_ar');
+    l_source        := JSON_VALUE(l_json, '$.source');
+    l_dataset_en    := JSON_VALUE(l_json, '$.dataset_en');
+    l_dataset_ar    := JSON_VALUE(l_json, '$.dataset_ar');
+    l_justification := JSON_VALUE(l_json, '$.justification');
+    l_use           := JSON_VALUE(l_json, '$.use');
 
     IF l_gls_id IS NULL THEN
         RAISE_APPLICATION_ERROR(-20001,
@@ -126,6 +134,10 @@ BEGIN
         upsert_cf(l_orig_id, 120, l_name_ar);
         upsert_cf(l_orig_id, 121, l_def_ar);
         upsert_cf(l_orig_id, 146, l_source);
+        upsert_cf(l_orig_id, 147, l_dataset_en);
+        upsert_cf(l_orig_id, 148, l_dataset_ar);
+        upsert_cf(l_orig_id, 149, l_justification);
+        upsert_cf(l_orig_id, 150, l_use);
 
         -- delete the temporary draft custom_field rows
         DELETE FROM SC_QAWS.CUSTOM_FIELD
@@ -153,6 +165,10 @@ BEGIN
         upsert_cf(l_gls_id, 120, l_name_ar);
         upsert_cf(l_gls_id, 121, l_def_ar);
         upsert_cf(l_gls_id, 146, l_source);
+        upsert_cf(l_gls_id, 147, l_dataset_en);
+        upsert_cf(l_gls_id, 148, l_dataset_ar);
+        upsert_cf(l_gls_id, 149, l_justification);
+        upsert_cf(l_gls_id, 150, l_use);
 
     END IF;
 

@@ -5,9 +5,11 @@ CREATE OR REPLACE FUNCTION SC_QAWS.F_GLOSSARY_THEME_TERMS (
 )
     RETURN CLOB
 IS
-    l_json  CLOB;
-    l_src   VARCHAR2(32767);
-    l_total NUMBER := 0;
+    l_json       CLOB;
+    l_src        VARCHAR2(32767);
+    l_total      NUMBER := 0;
+    l_dataset_en VARCHAR2(4000);
+    l_dataset_ar VARCHAR2(4000);
 
     TYPE t_term IS RECORD (
         id                  NUMBER,
@@ -70,8 +72,34 @@ BEGIN
            )
      WHERE term_seq = p_term_seq;
 
+    -- Resolve dataset EN/AR: MV column first, fall back to custom_field 147/148
+    l_dataset_en := r.dataset_name;
+    l_dataset_ar := r.dataset_name_ar;
+
+    IF l_dataset_en IS NULL THEN
+        BEGIN
+            SELECT customfieldvalue INTO l_dataset_en
+              FROM sc_qaws.custom_field
+             WHERE facetobjectid         = r.id
+               AND customfieldmetadataid = 147
+               AND ROWNUM = 1;
+        EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
+        END;
+    END IF;
+
+    IF l_dataset_ar IS NULL THEN
+        BEGIN
+            SELECT customfieldvalue INTO l_dataset_ar
+              FROM sc_qaws.custom_field
+             WHERE facetobjectid         = r.id
+               AND customfieldmetadataid = 148
+               AND ROWNUM = 1;
+        EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
+        END;
+    END IF;
+
     -- Resolve source label
-    IF r.term_source IS NULL AND r.dataset_name IS NOT NULL THEN
+    IF r.term_source IS NULL AND l_dataset_en IS NOT NULL THEN
         l_src :=
             'National Standards for Statistical Data / '
          || CHR(1583)||CHR(1604)||CHR(1610)||CHR(1604)||' '
@@ -95,8 +123,8 @@ BEGIN
      || '"parent_ref":'  || jstr(r.parent_term_ref)   || ','
      || '"name_en":'     || jstr(r.term_name_en)      || ','
      || '"name_ar":'     || jstr(r.term_name_ar)      || ','
-     || '"dataset_en":'  || jstr(r.dataset_name)      || ','
-     || '"dataset_ar":'  || jstr(r.dataset_name_ar)   || ','
+     || '"dataset_en":'  || jstr(l_dataset_en)          || ','
+     || '"dataset_ar":'  || jstr(l_dataset_ar)          || ','
      || '"source":'      || jstr(l_src)
     ));
 
