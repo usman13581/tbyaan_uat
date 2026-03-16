@@ -224,6 +224,11 @@
 .gls-textarea { min-height: 90px; resize: vertical; line-height: 1.65; }
 .gls-rtl      { text-align: right; direction: rtl; }
 
+/* ── Justification + Use fields (below term body) ──────── */
+.gls-submit-fields {
+    padding: 0 20px 18px;
+}
+
 /* ── 18. SLIDER NAV ─────────────────────────────────────── */
 .gls-slider-nav {
     display: flex;
