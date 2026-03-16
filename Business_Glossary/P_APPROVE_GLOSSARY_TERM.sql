@@ -38,9 +38,11 @@ AS
     l_dataset_ar    VARCHAR2(4000);
     l_justification VARCHAR2(4000);
     l_use           VARCHAR2(200);
+    l_parent_ref    VARCHAR2(200);
 
     -- for UPDATE path: original active term
     l_orig_id    NUMBER;
+    l_parent_id  NUMBER;
 
     l_cf_id      NUMBER;
     l_is_update  BOOLEAN := FALSE;
@@ -92,11 +94,23 @@ BEGIN
     l_dataset_ar    := JSON_VALUE(l_json, '$.dataset_ar');
     l_justification := JSON_VALUE(l_json, '$.justification');
     l_use           := JSON_VALUE(l_json, '$.use');
+    l_parent_ref    := JSON_VALUE(l_json, '$.parent_ref');
 
     IF l_gls_id IS NULL THEN
         RAISE_APPLICATION_ERROR(-20001,
             'P_APPROVE_GLOSSARY_TERM: glossary_id missing in JSON ' ||
             '(landing_id=' || TO_CHAR(l_landing_id) || ')');
+    END IF;
+
+    -- ── resolve parent_ref to parent_id ───────────────────────
+    IF l_parent_ref IS NOT NULL THEN
+        BEGIN
+            SELECT id INTO l_parent_id
+              FROM SC_QAWS.GLOSSARY
+             WHERE refnumber = l_parent_ref
+               AND ROWNUM = 1;
+        EXCEPTION WHEN NO_DATA_FOUND THEN l_parent_id := NULL;
+        END;
     END IF;
 
     -- ── detect NEW vs UPDATE ───────────────────────────────────
@@ -127,6 +141,7 @@ BEGIN
         UPDATE SC_QAWS.GLOSSARY
            SET primaryname        = l_name_en,
                description        = l_def_en,
+               parent_id          = NVL(l_parent_id, parent_id),
                lastupdatedatetime = SYSDATE
          WHERE id = l_orig_id;
 
@@ -156,6 +171,7 @@ BEGIN
         UPDATE SC_QAWS.GLOSSARY
            SET primaryname        = l_name_en,
                description        = l_def_en,
+               parent_id          = NVL(l_parent_id, parent_id),
                ispublic           = 1,   -- now visible in glossary UI
                status             = 1,   -- Active
                lastupdatedatetime = SYSDATE

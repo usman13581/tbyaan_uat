@@ -32,7 +32,7 @@ var GlossaryApp = (function () {
                 '<div class="gls-two-col">' +
                     '<div class="gls-field-group"><label class="gls-label">Code</label><input id="gls-code" type="text" class="gls-input gls-readonly" name="f04" readonly></div>' +
                     '<div class="gls-field-group"><label class="gls-label">Term Ref</label><input id="gls-termref" type="text" class="gls-input gls-readonly" name="f05" readonly></div>' +
-                    '<div class="gls-field-group"><label class="gls-label">Parent Ref</label><input id="gls-parentref" type="text" class="gls-input gls-user-field" name="f06" readonly></div>' +
+                    '<div class="gls-field-group"><label class="gls-label">Parent Ref</label><select id="gls-parentref" class="gls-input gls-user-field" name="f06" disabled></select></div>' +
                     '<div class="gls-field-group"><label class="gls-label">Source</label><input id="gls-source" type="text" class="gls-input gls-user-field" name="f11" readonly></div>' +
                 '</div>' +
                 '<div class="gls-two-col">' +
@@ -95,7 +95,16 @@ var GlossaryApp = (function () {
         set('gls-name-ar',    d.name_ar);
         set('gls-code',       d.code);
         set('gls-termref',    d.term_ref);
-        set('gls-parentref',  d.parent_ref);
+
+        /* parentref is a select — show current value as a single option in view mode */
+        var prEl = container.querySelector('#gls-parentref');
+        if (prEl) {
+            prEl.innerHTML = '<option value="' + (d.parent_ref || '') + '">' +
+                             (d.parent_ref || '—') + '</option>';
+            prEl.value    = d.parent_ref || '';
+            prEl.disabled = true;
+        }
+
         set('gls-dataset-en', d.dataset_en);
         set('gls-dataset-ar', d.dataset_ar);
         set('gls-def-en',     d.def_en);
@@ -694,8 +703,31 @@ var GlossaryApp = (function () {
                 container.querySelectorAll('.gls-submit-fields').forEach(function (el) {
                     el.style.display = '';
                 });
+
+                /* populate parent ref dropdown */
+                var prEl = container.querySelector('#gls-parentref');
+                if (prEl && prEl.tagName === 'SELECT') {
+                    var currentRef = prEl.value;
+                    prEl.innerHTML = '<option value="">-- Select Parent --</option>';
+                    prEl.disabled  = false;
+                    apex.server.process('GET_PARENT_TERMS', {}, {
+                        dataType: 'text',
+                        success: function (raw) {
+                            var parents;
+                            try { parents = JSON.parse(raw); } catch (e) { return; }
+                            parents.forEach(function (p) {
+                                var opt = document.createElement('option');
+                                opt.value = p.ref;
+                                opt.textContent = p.label;
+                                if (p.ref === currentRef) opt.selected = true;
+                                prEl.appendChild(opt);
+                            });
+                        }
+                    });
+                }
+
                 /* focus first editable field */
-                var first = container.querySelector('.gls-user-field');
+                var first = container.querySelector('.gls-user-field:not([disabled])');
                 if (first) first.focus();
             });
         }
@@ -791,7 +823,9 @@ var GlossaryWFApp = (function () {
                     '</div>' +
                     '<div class="gls-wf-field">' +
                         '<label class="gls-wf-label">Parent Ref</label>' +
-                        '<input id="gwf-parentref" type="text" class="gls-wf-input gls-wf-readonly" readonly>' +
+                        '<select id="gwf-parentref" class="gls-wf-input gwf-editable-select" disabled>' +
+                            '<option value="">Loading...</option>' +
+                        '</select>' +
                     '</div>' +
                     '<div class="gls-wf-field">' +
                         '<label class="gls-wf-label">Source</label>' +
@@ -859,7 +893,7 @@ var GlossaryWFApp = (function () {
         set('gwf-name-en',   d.name_en);
         set('gwf-name-ar',   d.name_ar);
         set('gwf-termref',   d.term_ref);
-        set('gwf-parentref', d.parent_ref);
+        /* gwf-parentref is a select — value set after GET_PARENT_TERMS loads options */
         set('gwf-source',        d.source);
         set('gwf-def-en',        d.def_en);
         set('gwf-def-ar',        d.def_ar);
@@ -879,7 +913,7 @@ var GlossaryWFApp = (function () {
             landing_id:  _landingId,
             glossary_id: _data ? _data.glossary_id : null,
             term_ref:    _data ? _data.term_ref    : '',
-            parent_ref:  _data ? _data.parent_ref  : '',
+            parent_ref:  val('gwf-parentref'),
             name_en:     val('gwf-name-en'),
             name_ar:     val('gwf-name-ar'),
             def_en:        val('gwf-def-en'),
@@ -964,11 +998,12 @@ var GlossaryWFApp = (function () {
 
                     if (result.status === 'ok') {
                         /* update local cache so re-entering edit shows saved values */
-                        _data.name_en      = payload.name_en;
-                        _data.name_ar      = payload.name_ar;
-                        _data.def_en       = payload.def_en;
-                        _data.def_ar       = payload.def_ar;
-                        _data.source       = payload.source;
+                        _data.parent_ref    = payload.parent_ref;
+                        _data.name_en       = payload.name_en;
+                        _data.name_ar       = payload.name_ar;
+                        _data.def_en        = payload.def_en;
+                        _data.def_ar        = payload.def_ar;
+                        _data.source        = payload.source;
                         _data.justification = payload.justification;
                         _data.use           = payload.use;
 
@@ -1024,6 +1059,25 @@ var GlossaryWFApp = (function () {
                     /* render card */
                     wrap.innerHTML = WF_CARD_HTML;
                     fillCard(wrap, d);
+
+                    /* populate parent ref dropdown */
+                    apex.server.process('GET_PARENT_TERMS', {}, {
+                        dataType: 'text',
+                        success: function (raw) {
+                            var parents;
+                            try { parents = JSON.parse(raw); } catch (e) { return; }
+                            var sel = wrap.querySelector('#gwf-parentref');
+                            if (!sel) return;
+                            sel.innerHTML = '<option value="">-- Select Parent --</option>';
+                            parents.forEach(function (p) {
+                                var opt = document.createElement('option');
+                                opt.value = p.ref;
+                                opt.textContent = p.label;
+                                if (p.ref === d.parent_ref) opt.selected = true;
+                                sel.appendChild(opt);
+                            });
+                        }
+                    });
 
                     /* bind Edit / Save button */
                     var btn = wrap.querySelector('#gls-wf-edit');

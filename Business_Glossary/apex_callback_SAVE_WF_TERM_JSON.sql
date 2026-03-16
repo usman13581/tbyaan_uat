@@ -28,6 +28,9 @@ DECLARE
     l_justification VARCHAR2(4000);
     l_use           VARCHAR2(200);
 
+    -- resolved parent
+    l_parent_id  NUMBER;
+
     -- preserved from original row
     l_orig_json  CLOB;
     l_subby      VARCHAR2(200);
@@ -141,10 +144,22 @@ BEGIN
            UPDATED_DATE = SYSDATE
      WHERE PROCESSES_LANDING_ID = l_landing_id;
 
+    -- ── resolve new parent_id if parent_ref provided ───────────
+    IF l_parent_ref IS NOT NULL THEN
+        BEGIN
+            SELECT id INTO l_parent_id
+              FROM SC_QAWS.GLOSSARY
+             WHERE refnumber = l_parent_ref
+               AND ROWNUM = 1;
+        EXCEPTION WHEN NO_DATA_FOUND THEN l_parent_id := NULL;
+        END;
+    END IF;
+
     -- ── update glossary base row ───────────────────────────────
     UPDATE SC_QAWS.GLOSSARY
        SET primaryname        = l_name_en,
            description        = l_def_en,
+           parent_id          = NVL(l_parent_id, parent_id),
            lastupdatedatetime = SYSDATE
      WHERE id = l_gls_id;
 
