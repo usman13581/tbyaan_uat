@@ -32,8 +32,11 @@ IS
         l := NVL(p, '');
         l := REPLACE(l, '\',  '\\');
         l := REPLACE(l, '"',  '\"');
-        l := REPLACE(l, CHR(10), '\n');
-        l := REPLACE(l, CHR(13), '');
+        l := REPLACE(l, CHR(9),  '\t');   -- tab
+        l := REPLACE(l, CHR(10), '\n');   -- newline
+        l := REPLACE(l, CHR(13), '');     -- CR
+        -- strip any remaining control characters (invalid in JSON strings)
+        l := REGEXP_REPLACE(l, '[[:cntrl:]]', '');
         RETURN '"' || l || '"';
     END jstr;
 
