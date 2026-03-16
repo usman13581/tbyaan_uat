@@ -5,11 +5,13 @@ CREATE OR REPLACE FUNCTION SC_QAWS.F_GLOSSARY_THEME_TERMS (
 )
     RETURN CLOB
 IS
-    l_json       CLOB;
-    l_src        VARCHAR2(32767);
-    l_total      NUMBER := 0;
-    l_dataset_en VARCHAR2(4000);
-    l_dataset_ar VARCHAR2(4000);
+    l_json          CLOB;
+    l_src           VARCHAR2(32767);
+    l_total         NUMBER := 0;
+    l_dataset_en    VARCHAR2(4000);
+    l_dataset_ar    VARCHAR2(4000);
+    l_justification VARCHAR2(4000);
+    l_use           VARCHAR2(200);
 
     TYPE t_term IS RECORD (
         id                  NUMBER,
@@ -101,6 +103,25 @@ BEGIN
         END;
     END IF;
 
+    -- Read justification (custom_field 149) and use (custom_field 150)
+    BEGIN
+        SELECT customfieldvalue INTO l_justification
+          FROM sc_qaws.custom_field
+         WHERE facetobjectid         = r.id
+           AND customfieldmetadataid = 149
+           AND ROWNUM = 1;
+    EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
+    END;
+
+    BEGIN
+        SELECT customfieldvalue INTO l_use
+          FROM sc_qaws.custom_field
+         WHERE facetobjectid         = r.id
+           AND customfieldmetadataid = 150
+           AND ROWNUM = 1;
+    EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
+    END;
+
     -- Resolve source label
     IF r.term_source IS NULL AND l_dataset_en IS NOT NULL THEN
         l_src :=
@@ -136,6 +157,10 @@ BEGIN
     DBMS_LOB.APPEND(l_json, TO_CLOB(jstr(SUBSTR(r.term_definition_en, 1, 4000))));
     DBMS_LOB.APPEND(l_json, TO_CLOB(',"def_ar":'));
     DBMS_LOB.APPEND(l_json, TO_CLOB(jstr(SUBSTR(r.term_definition_ar, 1, 4000))));
+    DBMS_LOB.APPEND(l_json, TO_CLOB(',"justification":'));
+    DBMS_LOB.APPEND(l_json, TO_CLOB(jstr(l_justification)));
+    DBMS_LOB.APPEND(l_json, TO_CLOB(',"use":'));
+    DBMS_LOB.APPEND(l_json, TO_CLOB(jstr(l_use)));
     DBMS_LOB.APPEND(l_json, TO_CLOB('}'));
 
     RETURN l_json;

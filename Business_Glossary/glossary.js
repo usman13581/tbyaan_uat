@@ -111,6 +111,12 @@ var GlossaryApp = (function () {
         set('gls-def-ar',     d.def_ar);
         set('gls-source',     d.source);
 
+        /* pre-populate submit fields so they show saved values in edit mode */
+        var jEl = container.querySelector('#gls-justification');
+        if (jEl) jEl.value = d.justification || '';
+        var uEl = container.querySelector('#gls-use');
+        if (uEl) uEl.value = d.use || '';
+
         /* counter + nav state */
         var elC = container.querySelector('.gls-current');
         var elT = container.querySelector('.gls-total');
