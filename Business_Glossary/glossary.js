@@ -7,8 +7,9 @@ var GlossaryApp = (function () {
     'use strict';
 
     var termCache = {};
-    var curTopic  = '';
-    var curTheme  = '';
+    var curTopic   = '';
+    var curTheme   = '';
+    var curDataset = '';   /* empty string = direct terms under theme */
     var curSeq    = 1;
     var curTotal  = 1;
     var isDirty   = false;
@@ -35,15 +36,18 @@ var GlossaryApp = (function () {
                     '<div class="gls-field-group"><label class="gls-label">Parent Ref</label><select id="gls-parentref" class="gls-input gls-user-field" name="f06" disabled></select></div>' +
                     '<div class="gls-field-group"><label class="gls-label">Source</label><input id="gls-source" type="text" class="gls-input gls-user-field" name="f11" readonly></div>' +
                 '</div>' +
-                '<div class="gls-two-col">' +
+                '<div class="gls-two-col" style="margin-top:12px">' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label">Dataset (EN)</label>' +
-                        '<input id="gls-dataset-en" type="text" class="gls-input gls-user-field" name="f07" readonly>' +
+                        '<input id="gls-dataset-en" type="text" class="gls-input gls-user-field" name="f07" readonly list="gls-ds-list-edit" autocomplete="off">' +
+                        '<datalist id="gls-ds-list-edit"></datalist>' +
                     '</div>' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label gls-lbl-ar">&#1575;&#1587;&#1605; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577; &#1575;&#1604;&#1576;&#1610;&#1575;&#1606;&#1575;&#1578;</label>' +
                         '<input id="gls-dataset-ar" type="text" class="gls-input gls-rtl gls-user-field" name="f08" dir="rtl" readonly>' +
                     '</div>' +
+                '</div>' +
+                '<div class="gls-two-col" style="margin-top:12px">' +
                     '<div class="gls-field-group">' +
                         '<label class="gls-label">Definition (EN)</label>' +
                         '<textarea id="gls-def-en" class="gls-textarea gls-user-field" name="f09" readonly></textarea>' +
@@ -72,6 +76,7 @@ var GlossaryApp = (function () {
             '</div>' +
         '</div>' +
         '<div class="gls-slider-nav">' +
+            '<button type="button" class="gls-nav-btn gls-delete-term">&#128465; Delete</button>' +
             '<button type="button" class="gls-nav-btn gls-prev">&#8592; Previous</button>' +
             '<div class="gls-slider-count">' +
                 '<span class="gls-current">1</span>' +
@@ -81,6 +86,21 @@ var GlossaryApp = (function () {
             '<button type="button" class="gls-nav-btn gls-next">Next &#8594;</button>' +
             '<button type="button" class="gls-nav-btn gls-last">Last &#8649;</button>' +
         '</div>';
+
+    /* ── Populate dataset datalist from left-panel tree ─── */
+    function populateDsDatalistFromTree(dl, topic, theme) {
+        if (!dl) return;
+        dl.innerHTML = '';
+        var root = document.querySelector('.gls-tree-wrap') || document;
+        root.querySelectorAll('.gls-dataset-btn').forEach(function (btn) {
+            if (btn.getAttribute('data-topic') === topic &&
+                btn.getAttribute('data-theme') === theme) {
+                var opt = document.createElement('option');
+                opt.value = btn.getAttribute('data-dataset');
+                dl.appendChild(opt);
+            }
+        });
+    }
 
     /* ── Inject JSON data into fixed card ─────────────────── */
     function fillCard(container, d) {
@@ -106,7 +126,12 @@ var GlossaryApp = (function () {
         }
 
         set('gls-dataset-en', d.dataset_en);
-        set('gls-dataset-ar', d.dataset_ar);
+        var arVal = d.dataset_ar;
+        if (!arVal && d.dataset_en) {
+            var dsBtn = document.querySelector('.gls-dataset-btn[data-dataset="' + (d.dataset_en || '').replace(/"/g, '\\"') + '"]');
+            if (dsBtn) { var arSpan = dsBtn.querySelector('.gls-dataset-ar'); if (arSpan) arVal = arSpan.textContent; }
+        }
+        set('gls-dataset-ar', arVal);
         set('gls-def-en',     d.def_en);
         set('gls-def-ar',     d.def_ar);
         set('gls-source',     d.source);
@@ -135,25 +160,32 @@ var GlossaryApp = (function () {
 
         /* reset to view mode on fresh term load */
         container.querySelectorAll('.gls-user-field').forEach(function (f) { f.readOnly = true; });
-        var hdrEdit   = document.getElementById('gls-hdr-edit');
-        var hdrSubmit = document.getElementById('gls-hdr-submit');
-        if (hdrEdit)   { hdrEdit.style.display = '';       hdrEdit.disabled = false; }
-        if (hdrSubmit) { hdrSubmit.style.display = 'none'; hdrSubmit.disabled = true; }
+        var hdrEdit      = document.getElementById('gls-hdr-edit');
+        var hdrSubmit    = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
+        if (hdrEdit)      { hdrEdit.style.display = '';       hdrEdit.disabled = false; }
+        if (hdrSubmit)    { hdrSubmit.style.display = 'none'; hdrSubmit.disabled = true; }
+        if (hdrSaveAdmin) { hdrSaveAdmin.style.display = 'none'; hdrSaveAdmin.disabled = true; }
+        /* show delete button only for admin users */
+        var delBtn = container.querySelector('.gls-delete-term');
+        if (delBtn) delBtn.style.display = isAdminUser() ? '' : 'none';
         isDirty = false;
     }
 
     /* ── Load term by seq ──────────────────────────────────── */
-    function loadTerm(topic, theme, seq) {
+    function loadTerm(topic, theme, dataset, seq) {
         var container = document.getElementById('gls-right-content');
         if (!container) return;
 
-        var cacheKey = topic + '||' + theme + '||' + seq;
-        curTopic = topic;
-        curTheme = theme;
-        curSeq   = seq;
+        dataset = dataset || '';
+        var cacheKey = topic + '||' + theme + '||' + dataset + '||' + seq;
+        curTopic   = topic;
+        curTheme   = theme;
+        curDataset = dataset;
+        curSeq     = seq;
 
-        /* show spinner only on first load of this theme */
-        if (!termCache[topic + '||' + theme + '||1']) {
+        /* show spinner only on first load of this group */
+        if (!termCache[topic + '||' + theme + '||' + dataset + '||1']) {
             container.innerHTML =
                 '<div class="gls-loading">' +
                     '<div class="gls-spinner"></div>' +
@@ -168,10 +200,10 @@ var GlossaryApp = (function () {
             return;
         }
 
-        /* Ajax */
+        /* Ajax — x04 carries dataset name (empty = direct terms) */
         apex.server.process(
             'GET_THEME_TERMS',
-            { x01: topic, x02: theme, x03: String(seq) },
+            { x01: topic, x02: theme, x03: String(seq), x04: dataset },
             {
                 dataType: 'text',
                 success: function (raw) {
@@ -226,10 +258,17 @@ var GlossaryApp = (function () {
                                 '<input id="gls-source" type="text" class="gls-input"></div>' +
                         '</div>' +
                         '<div class="gls-two-col" style="margin-top:12px">' +
-                            '<div class="gls-field-group"><label class="gls-label">Dataset (EN)</label>' +
-                                '<input id="gls-dataset-en" type="text" class="gls-input"></div>' +
-                            '<div class="gls-field-group"><label class="gls-label gls-lbl-ar">&#1575;&#1587;&#1605; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577; &#1575;&#1604;&#1576;&#1610;&#1575;&#1606;&#1575;&#1578;</label>' +
-                                '<input id="gls-dataset-ar" type="text" class="gls-input gls-rtl" dir="rtl"></div>' +
+                            '<div class="gls-field-group">' +
+                                '<label class="gls-label">Dataset (EN)</label>' +
+                                '<input id="gls-dataset-en" type="text" class="gls-input" list="gls-ds-list-new" autocomplete="off" placeholder="Select or type dataset...">' +
+                                '<datalist id="gls-ds-list-new"></datalist>' +
+                            '</div>' +
+                            '<div class="gls-field-group">' +
+                                '<label class="gls-label gls-lbl-ar">&#1575;&#1587;&#1605; &#1605;&#1580;&#1605;&#1608;&#1593;&#1577; &#1575;&#1604;&#1576;&#1610;&#1575;&#1606;&#1575;&#1578;</label>' +
+                                '<input id="gls-dataset-ar" type="text" class="gls-input gls-rtl" dir="rtl">' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="gls-two-col" style="margin-top:12px">' +
                             '<div class="gls-field-group"><label class="gls-label">Definition (EN) <span class="gls-req">*</span></label>' +
                                 '<textarea id="gls-def-en" class="gls-textarea"></textarea></div>' +
                             '<div class="gls-field-group"><label class="gls-label gls-lbl-ar">&#1575;&#1604;&#1578;&#1593;&#1585;&#1610;&#1601;</label>' +
@@ -259,10 +298,12 @@ var GlossaryApp = (function () {
             '</div>';
 
         /* hide edit/submit header buttons while in new-term mode */
-        var hdrEdit   = document.getElementById('gls-hdr-edit');
-        var hdrSubmit = document.getElementById('gls-hdr-submit');
-        if (hdrEdit)   hdrEdit.style.display   = 'none';
-        if (hdrSubmit) hdrSubmit.style.display = 'none';
+        var hdrEdit      = document.getElementById('gls-hdr-edit');
+        var hdrSubmit    = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
+        if (hdrEdit)      hdrEdit.style.display      = 'none';
+        if (hdrSubmit)    hdrSubmit.style.display    = 'none';
+        if (hdrSaveAdmin) hdrSaveAdmin.style.display = 'none';
 
         /* set topic / theme labels */
         var nt  = container.querySelector('.gls-new-topic');
@@ -283,7 +324,7 @@ var GlossaryApp = (function () {
             }
         });
 
-        /* fetch parent terms */
+        /* fetch parent terms, then wire dataset datalist on parent change */
         apex.server.process('GET_PARENT_TERMS', {}, {
             dataType: 'text',
             success: function (raw) {
@@ -303,6 +344,31 @@ var GlossaryApp = (function () {
                         opt.selected = true;
                     }
                     sel.appendChild(opt);
+                });
+
+                /* populate dataset datalist from current topic/theme */
+                populateDsDatalistFromTree(container.querySelector('#gls-ds-list-new'), curTopic, curTheme);
+
+                /* auto-fill Arabic dataset name when EN is changed */
+                var newDsEn = container.querySelector('#gls-dataset-en');
+                var newDsAr = container.querySelector('#gls-dataset-ar');
+                if (newDsEn && newDsAr) {
+                    newDsEn.addEventListener('change', function () {
+                        var btn = document.querySelector('.gls-dataset-btn[data-dataset="' + (this.value || '').replace(/"/g, '\\"') + '"]');
+                        var sp  = btn ? btn.querySelector('.gls-dataset-ar') : null;
+                        newDsAr.value = sp ? sp.textContent : '';
+                    });
+                }
+
+                /* reload datasets if user picks a different theme parent */
+                sel.addEventListener('change', function () {
+                    var dl  = container.querySelector('#gls-ds-list-new');
+                    var opt = sel.options[sel.selectedIndex];
+                    if (!opt || !sel.value) { if (dl) dl.innerHTML = ''; return; }
+                    var parts = opt.textContent.split(' › ');
+                    if (parts.length >= 2) {
+                        populateDsDatalistFromTree(dl, parts[0].trim(), parts[1].trim());
+                    }
                 });
             }
         });
@@ -359,11 +425,13 @@ var GlossaryApp = (function () {
             return;
         }
 
-        var submitBtn = container.querySelector('.gls-submit-changes');
+        var submitBtn    = container.querySelector('.gls-submit-changes');
         if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Saving...'; }
-        var hdrEdit   = document.getElementById('gls-hdr-edit');
-        var hdrSubmit = document.getElementById('gls-hdr-submit');
-        if (hdrSubmit) { hdrSubmit.disabled = true; hdrSubmit.textContent = '\u2713 Saving...'; }
+        var hdrEdit      = document.getElementById('gls-hdr-edit');
+        var hdrSubmit    = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
+        if (hdrSubmit)    { hdrSubmit.disabled = true;    hdrSubmit.textContent    = '\u2713 Saving...'; }
+        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = true; hdrSaveAdmin.textContent = '\u2713 Saving...'; }
 
         var payload = {
             type:       isNew ? 'NEW' : 'UPDATE',
@@ -405,8 +473,9 @@ var GlossaryApp = (function () {
                                 '</div>' +
                             '</div>';
                     } else {
-                        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '&#10003; Submit for Approval'; }
-                        if (hdrSubmit) { hdrSubmit.disabled = false; hdrSubmit.textContent = '\u2713 Submit Changes'; }
+                        if (submitBtn)    { submitBtn.disabled = false;    submitBtn.textContent    = '&#10003; Submit for Approval'; }
+                        if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
+                        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
                         var errDiv = document.createElement('div');
                         errDiv.className = 'gls-val-errors';
                         errDiv.textContent = result.message || 'Save failed. Please try again.';
@@ -415,9 +484,9 @@ var GlossaryApp = (function () {
                     }
                 },
                 error: function (xhr) {
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '&#10003; Submit for Approval'; }
-                    if (hdrSubmit) { hdrSubmit.disabled = false; hdrSubmit.textContent = '\u2713 Submit Changes'; }
-                    if (hdrEdit)   { /* stays hidden — user is still in edit mode */ }
+                    if (submitBtn)    { submitBtn.disabled = false;    submitBtn.textContent    = '&#10003; Submit for Approval'; }
+                    if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
+                    if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
                     var errDiv = document.createElement('div');
                     errDiv.className = 'gls-val-errors';
                     errDiv.textContent = xhr.responseText || 'Network error. Please try again.';
@@ -426,6 +495,125 @@ var GlossaryApp = (function () {
                 }
             }
         );
+    }
+
+    /* ── Save as Admin (direct save, no workflow) ─────────── */
+    function saveAsAdmin(container) {
+        var data   = collectCardData(container);
+        var errors = validateCard(data, false);
+
+        var prev = container.querySelector('.gls-val-errors');
+        if (prev) prev.parentNode.removeChild(prev);
+
+        if (errors.length) {
+            var errDiv = document.createElement('div');
+            errDiv.className = 'gls-val-errors';
+            errDiv.innerHTML = errors.map(function (e) { return '&#8226; ' + e; }).join('<br>');
+            var nav = container.querySelector('.gls-slider-nav');
+            if (nav) nav.parentNode.insertBefore(errDiv, nav);
+            return;
+        }
+
+        var hdrSubmit    = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
+        if (hdrSubmit)    { hdrSubmit.disabled = true;    hdrSubmit.textContent    = '\u2713 Saving...'; }
+        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = true; hdrSaveAdmin.textContent = '\u2713 Saving...'; }
+
+        var payload = {
+            type:          'UPDATE',
+            term_id:       String(curSeq),
+            code:          data.code,
+            term_ref:      data.term_ref,
+            parent_ref:    data.parent_ref,
+            name_en:       data.name_en,
+            name_ar:       data.name_ar,
+            dataset_en:    data.dataset_en,
+            dataset_ar:    data.dataset_ar,
+            def_en:        data.def_en,
+            def_ar:        data.def_ar,
+            source:        data.source,
+            justification: data.justification,
+            use:           data.use,
+            topic:         curTopic,
+            theme:         curTheme
+        };
+
+        apex.server.process(
+            'SAVE_ADMIN_TERM',
+            { x01: JSON.stringify(payload) },
+            {
+                dataType: 'text',
+                success: function (raw) {
+                    var result;
+                    try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
+                    if (result.status === 'ok') {
+                        /* hide both action buttons, restore Edit */
+                        if (hdrSubmit)    { hdrSubmit.style.display    = 'none'; hdrSubmit.disabled    = true; }
+                        if (hdrSaveAdmin) { hdrSaveAdmin.style.display = 'none'; hdrSaveAdmin.disabled = true; }
+                        var hdrEditBtn = document.getElementById('gls-hdr-edit');
+                        if (hdrEditBtn) { hdrEditBtn.style.display = ''; hdrEditBtn.disabled = false; hdrEditBtn.textContent = '\u270E Edit'; }
+                        /* lock fields back to view mode */
+                        container.querySelectorAll('.gls-user-field').forEach(function (f) { f.readOnly = true; });
+                        container.querySelectorAll('.gls-submit-fields').forEach(function (el) { el.style.display = 'none'; });
+                        /* clear any previous validation errors */
+                        var prevErr = container.querySelector('.gls-val-errors');
+                        if (prevErr) prevErr.parentNode.removeChild(prevErr);
+                    } else {
+                        if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
+                        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
+                        var errDiv = document.createElement('div');
+                        errDiv.className = 'gls-val-errors';
+                        errDiv.textContent = result.message || 'Save failed. Please try again.';
+                        var nav = container.querySelector('.gls-slider-nav');
+                        if (nav) nav.parentNode.insertBefore(errDiv, nav);
+                    }
+                },
+                error: function (xhr) {
+                    if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
+                    if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
+                    var errDiv = document.createElement('div');
+                    errDiv.className = 'gls-val-errors';
+                    errDiv.textContent = xhr.responseText || 'Network error. Please try again.';
+                    var nav = container.querySelector('.gls-slider-nav');
+                    if (nav) nav.parentNode.insertBefore(errDiv, nav);
+                }
+            }
+        );
+    }
+
+    /* ── Custom delete confirmation modal ─────────────────── */
+    function showDeleteConfirm(termName, onConfirm) {
+        /* remove any existing modal */
+        var old = document.getElementById('gls-del-modal');
+        if (old) old.parentNode.removeChild(old);
+
+        var overlay = document.createElement('div');
+        overlay.id        = 'gls-del-modal';
+        overlay.className = 'gls-del-overlay';
+        overlay.innerHTML =
+            '<div class="gls-del-dialog">' +
+                '<div class="gls-del-icon">&#128465;</div>' +
+                '<div class="gls-del-title">Delete Term</div>' +
+                '<div class="gls-del-msg">Are you sure you want to delete<br><strong>' +
+                    termName.replace(/</g,'&lt;').replace(/>/g,'&gt;') +
+                '</strong>?<br><span class="gls-del-warn">This action cannot be undone.</span></div>' +
+                '<div class="gls-del-actions">' +
+                    '<button type="button" class="gls-del-btn-cancel">Cancel</button>' +
+                    '<button type="button" class="gls-del-btn-confirm">Delete</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        function close() { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); }
+
+        overlay.querySelector('.gls-del-btn-cancel').addEventListener('click', close);
+        overlay.querySelector('.gls-del-btn-confirm').addEventListener('click', function () {
+            close();
+            onConfirm();
+        });
+        /* close on backdrop click */
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     }
 
     /* ── Event delegation on right panel ──────────────────── */
@@ -457,15 +645,15 @@ var GlossaryApp = (function () {
             var t = e.target;
 
             if (t.classList.contains('gls-prev') && !t.disabled && curSeq > 1) {
-                loadTerm(curTopic, curTheme, curSeq - 1);
+                loadTerm(curTopic, curTheme, curDataset, curSeq - 1);
                 return;
             }
             if (t.classList.contains('gls-next') && !t.disabled && curSeq < curTotal) {
-                loadTerm(curTopic, curTheme, curSeq + 1);
+                loadTerm(curTopic, curTheme, curDataset, curSeq + 1);
                 return;
             }
             if (t.classList.contains('gls-last') && !t.disabled && curSeq < curTotal) {
-                loadTerm(curTopic, curTheme, curTotal);
+                loadTerm(curTopic, curTheme, curDataset, curTotal);
                 return;
             }
 
@@ -482,10 +670,97 @@ var GlossaryApp = (function () {
                 return;
             }
 
+            /* delete current term */
+            if (t.classList.contains('gls-delete-term')) {
+                var termNameEl = container.querySelector('#gls-name-en');
+                var termName   = termNameEl ? termNameEl.value : 'this term';
+                var termRefEl  = container.querySelector('#gls-termref');
+                var termRef    = termRefEl ? termRefEl.value : '';
+                var delBtn     = t;
+                var snapTopic  = curTopic, snapTheme = curTheme, snapDataset = curDataset;
+
+                showDeleteConfirm(termName, function () {
+                    delBtn.disabled    = true;
+                    delBtn.textContent = 'Deleting\u2026';
+
+                    apex.server.process(
+                        'DELETE_TERM',
+                        { x01: termRef, x02: snapTopic, x03: snapTheme, x04: snapDataset },
+                        {
+                            dataType: 'text',
+                            success: function (raw) {
+                                var result;
+                                try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
+                                if (result.status === 'ok') {
+                                    /* 1. Clear cache for this group */
+                                    var prefix = snapTopic + '||' + snapTheme + '||' + snapDataset + '||';
+                                    Object.keys(termCache).forEach(function (k) {
+                                        if (k.indexOf(prefix) === 0) delete termCache[k];
+                                    });
+
+                                    /* 2. Remove term from left-panel tree */
+                                    var activeNavBtn = document.querySelector('.gls-term-nav-btn.is-active');
+                                    if (activeNavBtn) activeNavBtn.parentNode.removeChild(activeNavBtn);
+
+                                    /* 3. Decrement topic term count */
+                                    var treeRoot = document.querySelector('.gls-tree-wrap');
+                                    if (treeRoot) {
+                                        treeRoot.querySelectorAll('.gls-topic-btn').forEach(function (tb) {
+                                            var en = tb.querySelector('.gls-topic-en');
+                                            if (en && en.textContent.trim() === snapTopic) {
+                                                var cntEl = tb.querySelector('.gls-topic-count');
+                                                if (cntEl) {
+                                                    var n = parseInt(cntEl.textContent.replace(/[()]/g,''), 10) || 0;
+                                                    if (n > 0) cntEl.textContent = '(' + (n - 1) + ')';
+                                                }
+                                            }
+                                        });
+                                    }
+
+                                    /* 4. Show success in right panel */
+                                    container.innerHTML =
+                                        '<div class="gls-success-msg">' +
+                                            '<div class="gls-success-icon">&#10003;</div>' +
+                                            '<div class="gls-success-title">Term Deleted</div>' +
+                                            '<div class="gls-success-text">"' + termName + '" has been deleted from the glossary.</div>' +
+                                        '</div>';
+                                } else {
+                                    delBtn.disabled    = false;
+                                    delBtn.textContent = '\uD83D\uDDD1 Delete';
+                                    showDeleteConfirm.__error = true;
+                                    var old = document.getElementById('gls-del-modal');
+                                    if (old) old.parentNode.removeChild(old);
+                                    /* show inline error */
+                                    var prev2 = container.querySelector('.gls-val-errors');
+                                    if (prev2) prev2.parentNode.removeChild(prev2);
+                                    var errDiv = document.createElement('div');
+                                    errDiv.className = 'gls-val-errors';
+                                    errDiv.textContent = result.message || 'Delete failed. Please try again.';
+                                    var nav2 = container.querySelector('.gls-slider-nav');
+                                    if (nav2) nav2.parentNode.insertBefore(errDiv, nav2);
+                                }
+                            },
+                            error: function (xhr) {
+                                delBtn.disabled    = false;
+                                delBtn.textContent = '\uD83D\uDDD1 Delete';
+                                var prev3 = container.querySelector('.gls-val-errors');
+                                if (prev3) prev3.parentNode.removeChild(prev3);
+                                var errDiv2 = document.createElement('div');
+                                errDiv2.className = 'gls-val-errors';
+                                errDiv2.textContent = xhr.responseText || 'Network error. Please try again.';
+                                var nav3 = container.querySelector('.gls-slider-nav');
+                                if (nav3) nav3.parentNode.insertBefore(errDiv2, nav3);
+                            }
+                        }
+                    );
+                });
+                return;
+            }
+
             /* cancel — go back to current term */
             if (t.classList.contains('gls-cancel-new')) {
                 isDirty = false;
-                loadTerm(curTopic, curTheme, curSeq);
+                loadTerm(curTopic, curTheme, curDataset, curSeq);
                 return;
             }
         });
@@ -512,18 +787,87 @@ var GlossaryApp = (function () {
         });
     }
 
-    /* ── Themes ────────────────────────────────────────────── */
+    /* ── Themes + Datasets ─────────────────────────────────── */
     function bindThemes(root) {
         var wrap = root.querySelector('.gls-tree-wrap') || root;
         if (wrap.dataset.themesBound === 'Y') return;
         wrap.dataset.themesBound = 'Y';
-        /* event delegation — works even if tree renders after init */
+
         wrap.addEventListener('click', function (e) {
+
+            /* ── 1. Term nav button inside expanded dataset ── */
+            var termBtn = e.target.closest('.gls-term-nav-btn');
+            if (termBtn) {
+                wrap.querySelectorAll('.gls-term-nav-btn.is-active')
+                    .forEach(function (b) { b.classList.remove('is-active'); });
+                termBtn.classList.add('is-active');
+                var tl = termBtn.closest('.gls-term-list');
+                loadTerm(
+                    tl.getAttribute('data-topic'),
+                    tl.getAttribute('data-theme'),
+                    tl.getAttribute('data-dataset') || '',
+                    parseInt(termBtn.getAttribute('data-seq'), 10)
+                );
+                return;
+            }
+
+            /* ── 2. Dataset button — toggle term list expansion ── */
+            var dsBtn = e.target.closest('.gls-dataset-btn');
+            if (dsBtn) {
+                var item  = dsBtn.closest('.gls-dataset-item');
+                var tList = item ? item.querySelector('.gls-term-list') : null;
+                if (tList) {
+                    if (dsBtn.classList.contains('is-open')) {
+                        dsBtn.classList.remove('is-open');
+                        tList.style.display = 'none';
+                    } else {
+                        dsBtn.classList.add('is-open');
+                        tList.style.display = 'block';
+                        if (!tList.dataset.loaded) { loadTreeTerms(dsBtn, tList); }
+                    }
+                }
+                return;
+            }
+
+            /* ── 3. Theme button — load direct terms in right panel ── */
             var btn = e.target.closest('.gls-theme-btn');
             if (!btn) return;
-            wrap.querySelectorAll('.gls-theme-btn').forEach(function (b) { b.classList.remove('is-active'); });
+            wrap.querySelectorAll('.gls-theme-btn.is-active, .gls-dataset-btn.is-active')
+                .forEach(function (b) { b.classList.remove('is-active'); });
             btn.classList.add('is-active');
-            loadTerm(btn.getAttribute('data-topic'), btn.getAttribute('data-theme'), 1);
+            loadTerm(btn.getAttribute('data-topic'), btn.getAttribute('data-theme'), '', 1);
+        });
+    }
+
+    /* ── Lazy-load terms into dataset expansion list ────────── */
+    function loadTreeTerms(dsBtn, tList) {
+        tList.innerHTML = '<div class="gls-term-loading">Loading\u2026</div>';
+        apex.server.process('GET_TREE_TERMS', {
+            x01: dsBtn.getAttribute('data-topic'),
+            x02: dsBtn.getAttribute('data-theme'),
+            x03: dsBtn.getAttribute('data-dataset') || ''
+        }, {
+            dataType: 'text',
+            success: function (raw) {
+                var terms = [];
+                try { terms = JSON.parse(raw); } catch (ex) {}
+                if (!terms.length) {
+                    tList.innerHTML = '<div class="gls-term-empty">No terms</div>';
+                } else {
+                    var html = '';
+                    terms.forEach(function (t) {
+                        html += '<button type="button" class="gls-term-nav-btn"'
+                              + ' data-seq="' + t.seq + '">'
+                              + escHtml(t.name_en)
+                              + '</button>';
+                    });
+                    tList.innerHTML = html;
+                }
+                tList.dataset.loaded = 'Y';
+            },
+            error: function () {
+                tList.innerHTML = '<div class="gls-term-empty" style="color:#ef4444">Error loading</div>';
+            }
         });
     }
 
@@ -533,6 +877,11 @@ var GlossaryApp = (function () {
         var list = btn ? root.querySelector('#' + btn.getAttribute('data-target')) : null;
         if (btn)  btn.classList.add('is-open');
         if (list) list.classList.add('is-open');
+    }
+
+    /* ── Admin user check ──────────────────────────────────── */
+    function isAdminUser() {
+        return !!document.getElementById('gls-is-admin');
     }
 
     /* ── Search helpers ────────────────────────────────────── */
@@ -605,11 +954,16 @@ var GlossaryApp = (function () {
 
             var html = '<div class="gls-search-results">';
             results.forEach(function (r) {
+                /* build breadcrumb: topic > theme [ > dataset ] */
+                var path = escHtml(r.topic || '') + ' &rsaquo; ' + escHtml(r.theme || '');
+                if (r.dataset) { path += ' &rsaquo; ' + escHtml(r.dataset); }
+
                 html +=
                     '<div class="gls-result-item"' +
-                        ' data-topic="' + escAttr(r.topic) + '"' +
-                        ' data-theme="' + escAttr(r.theme) + '"' +
-                        ' data-seq="'   + (r.seq || 1)     + '">' +
+                        ' data-topic="'   + escAttr(r.topic)   + '"' +
+                        ' data-theme="'   + escAttr(r.theme)   + '"' +
+                        ' data-dataset="' + escAttr(r.dataset || '') + '"' +
+                        ' data-seq="'     + (r.seq || 1)       + '">' +
                         '<div class="gls-result-names">' +
                             '<span class="gls-result-en">' + escHtml(r.name_en) + '</span>' +
                             (r.name_ar
@@ -618,9 +972,7 @@ var GlossaryApp = (function () {
                         '</div>' +
                         '<div class="gls-result-meta">' +
                             (r.code ? '<span class="gls-result-code">' + escHtml(r.code) + '</span>' : '') +
-                            '<span class="gls-result-path">' +
-                                escHtml(r.topic || '') + ' &rsaquo; ' + escHtml(r.theme || '') +
-                            '</span>' +
+                            '<span class="gls-result-path">' + path + '</span>' +
                         '</div>' +
                         (r.def ? '<div class="gls-result-def">' + escHtml(r.def) + '&hellip;</div>' : '') +
                     '</div>';
@@ -628,36 +980,52 @@ var GlossaryApp = (function () {
             html += '</div>';
             container.innerHTML = html;
 
-            /* click result → load that theme */
+            /* click result → navigate to that term */
             container.querySelectorAll('.gls-result-item').forEach(function (item) {
                 item.addEventListener('click', function () {
-                    var topic = item.getAttribute('data-topic');
-                    var theme = item.getAttribute('data-theme');
-                    var seq   = parseInt(item.getAttribute('data-seq'), 10) || 1;
-                    var root  = document.querySelector('.gls-tree-wrap') || document;
+                    var topic   = item.getAttribute('data-topic');
+                    var theme   = item.getAttribute('data-theme');
+                    var dataset = item.getAttribute('data-dataset') || '';
+                    var seq     = parseInt(item.getAttribute('data-seq'), 10) || 1;
+                    var root    = document.querySelector('.gls-tree-wrap') || document;
 
-                    /* deactivate all themes */
-                    root.querySelectorAll('.gls-theme-btn').forEach(function (b) {
-                        b.classList.remove('is-active');
-                    });
+                    /* deactivate all nav buttons */
+                    root.querySelectorAll('.gls-theme-btn.is-active, .gls-dataset-btn.is-active')
+                        .forEach(function (b) { b.classList.remove('is-active'); });
 
-                    /* find and activate matching theme button */
-                    root.querySelectorAll('.gls-theme-btn').forEach(function (b) {
-                        if (b.getAttribute('data-topic') === topic &&
-                            b.getAttribute('data-theme') === theme) {
-                            b.classList.add('is-active');
-                            /* expand parent topic */
-                            var tList = b.closest('.gls-theme-list');
-                            if (tList) {
-                                tList.classList.add('is-open');
-                                var topicBtn = root.querySelector(
-                                    '[data-target="' + tList.id + '"]');
-                                if (topicBtn) topicBtn.classList.add('is-open');
+                    if (dataset) {
+                        /* activate matching dataset button */
+                        root.querySelectorAll('.gls-dataset-btn').forEach(function (b) {
+                            if (b.getAttribute('data-topic')   === topic &&
+                                b.getAttribute('data-theme')   === theme &&
+                                b.getAttribute('data-dataset') === dataset) {
+                                b.classList.add('is-active');
+                                /* expand parent topic */
+                                var tList = b.closest('.gls-theme-list');
+                                if (tList) {
+                                    tList.classList.add('is-open');
+                                    var topicBtn = root.querySelector('[data-target="' + tList.id + '"]');
+                                    if (topicBtn) topicBtn.classList.add('is-open');
+                                }
                             }
-                        }
-                    });
+                        });
+                    } else {
+                        /* activate matching theme button (direct terms) */
+                        root.querySelectorAll('.gls-theme-btn').forEach(function (b) {
+                            if (b.getAttribute('data-topic') === topic &&
+                                b.getAttribute('data-theme') === theme) {
+                                b.classList.add('is-active');
+                                var tList = b.closest('.gls-theme-list');
+                                if (tList) {
+                                    tList.classList.add('is-open');
+                                    var topicBtn = root.querySelector('[data-target="' + tList.id + '"]');
+                                    if (topicBtn) topicBtn.classList.add('is-open');
+                                }
+                            }
+                        });
+                    }
 
-                    loadTerm(topic, theme, seq);
+                    loadTerm(topic, theme, dataset, seq);
                 });
             });
         }
@@ -690,13 +1058,14 @@ var GlossaryApp = (function () {
 
     /* ── Header action buttons (search bar) ────────────────── */
     function initHeaderBtns() {
-        var hdrEdit    = document.getElementById('gls-hdr-edit');
-        var hdrSubmit  = document.getElementById('gls-hdr-submit');
-        var hdrNewTerm = document.getElementById('gls-hdr-new-term');
-        var container  = document.getElementById('gls-right-content');
+        var hdrEdit      = document.getElementById('gls-hdr-edit');
+        var hdrSubmit    = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
+        var hdrNewTerm   = document.getElementById('gls-hdr-new-term');
+        var container    = document.getElementById('gls-right-content');
         if (!container) return;
 
-        /* Edit: unlock fields and swap to Submit */
+        /* Edit: unlock fields and show Submit Changes + Save as Admin */
         if (hdrEdit) {
             hdrEdit.addEventListener('click', function () {
                 if (hdrEdit.disabled) return;
@@ -704,7 +1073,8 @@ var GlossaryApp = (function () {
                     f.readOnly = false;
                 });
                 hdrEdit.style.display = 'none';
-                if (hdrSubmit) { hdrSubmit.style.display = ''; hdrSubmit.disabled = false; }
+                if (hdrSubmit)    { hdrSubmit.style.display    = ''; hdrSubmit.disabled    = false; }
+                if (hdrSaveAdmin && isAdminUser()) { hdrSaveAdmin.style.display = ''; hdrSaveAdmin.disabled = false; }
                 /* show justification + use fields */
                 container.querySelectorAll('.gls-submit-fields').forEach(function (el) {
                     el.style.display = '';
@@ -728,6 +1098,32 @@ var GlossaryApp = (function () {
                                 if (p.ref === currentRef) opt.selected = true;
                                 prEl.appendChild(opt);
                             });
+
+                            /* populate dataset datalist from current topic/theme */
+                            var dl = container.querySelector('#gls-ds-list-edit');
+                            populateDsDatalistFromTree(dl, curTopic, curTheme);
+
+                            /* auto-fill Arabic dataset name when EN is changed */
+                            var dsEnInput = container.querySelector('#gls-dataset-en');
+                            var dsArInput = container.querySelector('#gls-dataset-ar');
+                            if (dsEnInput && dsArInput) {
+                                dsEnInput.addEventListener('change', function () {
+                                    var btn = document.querySelector('.gls-dataset-btn[data-dataset="' + (this.value || '').replace(/"/g, '\\"') + '"]');
+                                    var sp  = btn ? btn.querySelector('.gls-dataset-ar') : null;
+                                    dsArInput.value = sp ? sp.textContent : '';
+                                });
+                            }
+
+                            /* reload datasets if user picks a different theme parent */
+                            prEl.addEventListener('change', function () {
+                                var dl2  = container.querySelector('#gls-ds-list-edit');
+                                var opt2 = prEl.options[prEl.selectedIndex];
+                                if (!opt2 || !prEl.value) { if (dl2) dl2.innerHTML = ''; return; }
+                                var parts = opt2.textContent.split(' › ');
+                                if (parts.length >= 2) {
+                                    populateDsDatalistFromTree(dl2, parts[0].trim(), parts[1].trim());
+                                }
+                            });
                         }
                     });
                 }
@@ -747,6 +1143,14 @@ var GlossaryApp = (function () {
             });
         }
 
+        /* Save as Admin (direct save, no workflow) */
+        if (hdrSaveAdmin) {
+            hdrSaveAdmin.addEventListener('click', function () {
+                if (hdrSaveAdmin.disabled) return;
+                saveAsAdmin(container);
+            });
+        }
+
         /* New Term */
         if (hdrNewTerm) {
             hdrNewTerm.addEventListener('click', function () {
@@ -761,7 +1165,6 @@ var GlossaryApp = (function () {
         if (!root.querySelector('.gls-tree-wrap')) return;
         bindTopics(root);
         bindThemes(root);
-        openFirstTopic(root);
         bindRightPanel();
         initSearch();
         initHeaderBtns();

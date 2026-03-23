@@ -1,36 +1,56 @@
 CREATE OR REPLACE FUNCTION SC_QAWS.F_BUSINESS_GLOSSARY_TREE
     RETURN CLOB
 IS
-    l_html      CLOB;
-    l_left      CLOB;
-    l_gname     VARCHAR2(4000);
-    l_gname_ar  VARCHAR2(4000);
-    l_prev_top  VARCHAR2(4000);
-    l_prev_thm  VARCHAR2(4000);
-    l_topic_i   PLS_INTEGER := 0;
-    l_theme_i   PLS_INTEGER := 0;
-    l_first_th  BOOLEAN     := TRUE;
-    l_has_rows  BOOLEAN     := FALSE;
+    l_html        CLOB;
+    l_left        CLOB;
+    l_topic_i     PLS_INTEGER := 0;
+    l_theme_i     PLS_INTEGER := 0;
+    l_first_th    BOOLEAN     := TRUE;
+    l_has_rows    BOOLEAN     := FALSE;
+    l_has_ds      BOOLEAN     := FALSE;
+    l_term_count  PLS_INTEGER := 0;
 
-    CURSOR c IS
+    -- Distinct topics ordered alphabetically (OTHERS last)
+    CURSOR c_topics IS
         SELECT DISTINCT
-               glossary_name,     glossary_name_ar,
-               topic_name,        topic_name_ar,
-               theme_name,        theme_name_ar
+               topic_name,      topic_name_ar
           FROM sc_qaws.business_glossary
          WHERE "Axon Viewing" = 'Public'
            AND glossary_name != 'National Standards for Statistical Data (NSSD)'
-         ORDER BY UPPER(TRIM(glossary_name)) NULLS LAST,
-                  CASE WHEN topic_name IS NULL                  THEN 'ZZZZ'
-                       WHEN UPPER(TRIM(topic_name)) = 'OTHERS' THEN 'ZZZZ'
-                       ELSE UPPER(TRIM(topic_name))
-                  END,
-                  CASE WHEN theme_name IS NULL                  THEN 'ZZZZ'
-                       WHEN UPPER(TRIM(theme_name)) = 'GENERIC' THEN 'ZZZZ'
-                       ELSE UPPER(TRIM(theme_name))
-                  END;
+         ORDER BY
+               CASE WHEN topic_name IS NULL                  THEN 'ZZZZ'
+                    WHEN UPPER(TRIM(topic_name)) = 'OTHERS'  THEN 'ZZZZ'
+                    ELSE UPPER(TRIM(topic_name))
+               END NULLS LAST;
 
-    r c%ROWTYPE;
+    -- Themes within a topic (GENERIC last)
+    CURSOR c_themes (p_topic IN VARCHAR2) IS
+        SELECT DISTINCT
+               theme_name,      theme_name_ar
+          FROM sc_qaws.business_glossary
+         WHERE "Axon Viewing" = 'Public'
+           AND glossary_name != 'National Standards for Statistical Data (NSSD)'
+           AND (   (p_topic IS NULL     AND topic_name IS NULL)
+                OR (p_topic IS NOT NULL AND topic_name = p_topic)
+               )
+         ORDER BY
+               CASE WHEN theme_name IS NULL                   THEN 'ZZZZ'
+                    WHEN UPPER(TRIM(theme_name)) = 'GENERIC'  THEN 'ZZZZ'
+                    ELSE UPPER(TRIM(theme_name))
+               END NULLS LAST;
+
+    -- Datasets within a topic (all themes combined, sorted by name)
+    CURSOR c_datasets (p_topic IN VARCHAR2) IS
+        SELECT DISTINCT
+               theme_name,      dataset_name,      dataset_name_ar
+          FROM sc_qaws.business_glossary
+         WHERE "Axon Viewing" = 'Public'
+           AND glossary_name != 'National Standards for Statistical Data (NSSD)'
+           AND (   (p_topic IS NULL     AND topic_name IS NULL)
+                OR (p_topic IS NOT NULL AND topic_name = p_topic)
+               )
+           AND dataset_name IS NOT NULL
+         ORDER BY dataset_name;
 
     PROCEDURE al (p IN VARCHAR2) IS
     BEGIN
@@ -39,76 +59,101 @@ IS
     END al;
 
 BEGIN
-    OPEN c;
-    LOOP
-        FETCH c INTO r;
-        EXIT WHEN c%NOTFOUND;
+    FOR rt IN c_topics LOOP
         l_has_rows := TRUE;
+        l_topic_i  := l_topic_i + 1;
 
-        IF l_gname IS NULL THEN
-            l_gname    := r.glossary_name;
-            l_gname_ar := r.glossary_name_ar;
-        END IF;
+        /* ── Count terms for this topic ─────────────────────── */
+        SELECT COUNT(*) INTO l_term_count
+          FROM sc_qaws.business_glossary
+         WHERE "Axon Viewing" = 'Public'
+           AND glossary_name  != 'National Standards for Statistical Data (NSSD)'
+           AND (   (rt.topic_name IS NULL     AND topic_name IS NULL)
+                OR (rt.topic_name IS NOT NULL AND topic_name = rt.topic_name)
+               );
 
-        /* NEW TOPIC */
-        IF NVL(l_prev_top,'#NULL#') <> NVL(r.topic_name,'#NULL#') THEN
-            IF l_prev_top IS NOT NULL THEN
-                al('</div></div>');  /* close theme-list + topic-item */
-            END IF;
-
-            l_topic_i  := l_topic_i + 1;
-            l_prev_top := r.topic_name;
-            l_prev_thm := NULL;
-
-            al(
-                   '<div class="gls-topic-item">'
-                ||   '<button type="button" class="gls-topic-btn"'
-                ||     ' data-target="tlist-' || TO_CHAR(l_topic_i) || '">'
-                ||     '<span class="gls-topic-arrow">&#8250;</span>'
-                ||     '<div class="gls-topic-titles">'
-                ||       '<span class="gls-topic-en">'
-                ||         apex_escape.html(NVL(r.topic_name,'No Topic'))
-                ||       '</span>'
-                ||       CASE WHEN r.topic_name_ar IS NOT NULL THEN
+        /* ── Topic header ───────────────────────────────────── */
+        al(
+               '<div class="gls-topic-item">'
+            ||   '<button type="button" class="gls-topic-btn"'
+            ||     ' data-target="tlist-' || TO_CHAR(l_topic_i) || '">'
+            ||     '<span class="gls-topic-arrow">&#8250;</span>'
+            ||     '<div class="gls-topic-titles">'
+            ||       '<span class="gls-topic-en">'
+            ||         apex_escape.html(NVL(rt.topic_name, 'No Topic'))
+            ||       '</span>'
+            ||       CASE WHEN rt.topic_name_ar IS NOT NULL THEN
                                '<span class="gls-topic-ar" dir="rtl">'
-                            || apex_escape.html(r.topic_name_ar) || '</span>'
-                          ELSE '' END
-                ||     '</div>'
-                ||   '</button>'
-                ||   '<div class="gls-theme-list" id="tlist-' || TO_CHAR(l_topic_i) || '">'
-            );
-        END IF;
+                            || apex_escape.html(rt.topic_name_ar) || '</span>'
+                      ELSE '' END
+            ||     '</div>'
+            ||     '<span class="gls-topic-count">(' || TO_CHAR(l_term_count) || ')</span>'
+            ||   '</button>'
+            ||   '<div class="gls-theme-list" id="tlist-' || TO_CHAR(l_topic_i) || '">'
+        );
 
-        /* NEW THEME */
-        IF NVL(l_prev_thm,'#NULL#') <> NVL(r.theme_name,'#NULL#') THEN
-            l_theme_i  := l_theme_i + 1;
-            l_prev_thm := r.theme_name;
-
+        /* ── Themes first ───────────────────────────────────── */
+        FOR rth IN c_themes(rt.topic_name) LOOP
+            l_theme_i := l_theme_i + 1;
             al(
-                   '<button type="button"'
-                ||   ' class="gls-theme-btn' || CASE WHEN l_first_th THEN ' is-active' ELSE '' END || '"'
+                   '<div class="gls-theme-item">'
+                || '<button type="button"'
+                ||   ' class="gls-theme-btn'
+                ||     CASE WHEN l_first_th THEN ' is-active' ELSE '' END || '"'
                 ||   ' data-theme-id="' || TO_CHAR(l_theme_i) || '"'
-                ||   ' data-topic="' || apex_escape.html_attribute(r.topic_name) || '"'
-                ||   ' data-theme="' || apex_escape.html_attribute(r.theme_name) || '">'
-                ||   '<span class="gls-theme-en">' || apex_escape.html(NVL(r.theme_name,'No Theme')) || '</span>'
-                ||   CASE WHEN r.theme_name_ar IS NOT NULL THEN
-                           '<span class="gls-theme-ar" dir="rtl">'
-                        || apex_escape.html(r.theme_name_ar) || '</span>'
-                     ELSE '' END
+                ||   ' data-topic="'    || apex_escape.html_attribute(rt.topic_name)  || '"'
+                ||   ' data-theme="'    || apex_escape.html_attribute(rth.theme_name) || '"'
+                ||   ' data-dataset="">'
+                ||   '<span class="gls-theme-en">'
+                ||     apex_escape.html(NVL(rth.theme_name, 'No Theme'))
+                ||   '</span>'
+                ||   CASE WHEN rth.theme_name_ar IS NOT NULL THEN
+                               '<span class="gls-theme-ar" dir="rtl">'
+                            || apex_escape.html(rth.theme_name_ar) || '</span>'
+                      ELSE '' END
                 || '</button>'
+                || '</div>'
             );
-
             l_first_th := FALSE;
-        END IF;
+        END LOOP;
 
+        /* ── Datasets at end ────────────────────────────────── */
+        l_has_ds := FALSE;
+        FOR rds IN c_datasets(rt.topic_name) LOOP
+            IF NOT l_has_ds THEN
+                al('<div class="gls-dataset-list">');
+                l_has_ds := TRUE;
+            END IF;
+            al(
+                   '<div class="gls-dataset-item">'
+                || '<button type="button" class="gls-dataset-btn"'
+                ||   ' data-topic="'   || apex_escape.html_attribute(rt.topic_name)    || '"'
+                ||   ' data-theme="'   || apex_escape.html_attribute(rds.theme_name)   || '"'
+                ||   ' data-dataset="' || apex_escape.html_attribute(rds.dataset_name) || '">'
+                ||   '<span class="gls-ds-arrow">&#8250;</span>'
+                ||   '<span class="gls-dataset-en">'
+                ||     apex_escape.html(rds.dataset_name)
+                ||   '</span>'
+                ||   CASE WHEN rds.dataset_name_ar IS NOT NULL THEN
+                               '<span class="gls-dataset-ar" dir="rtl">'
+                            || apex_escape.html(rds.dataset_name_ar) || '</span>'
+                      ELSE '' END
+                || '</button>'
+                || '<div class="gls-term-list"'
+                ||   ' data-topic="'   || apex_escape.html_attribute(rt.topic_name)    || '"'
+                ||   ' data-theme="'   || apex_escape.html_attribute(rds.theme_name)   || '"'
+                ||   ' data-dataset="' || apex_escape.html_attribute(rds.dataset_name) || '">'
+                || '</div>'
+                || '</div>'
+            );
+        END LOOP;
+        IF l_has_ds THEN al('</div>'); END IF;  /* gls-dataset-list */
+
+        /* ── Close theme-list + topic-item ──────────────────── */
+        al('</div></div>');
     END LOOP;
-    CLOSE c;
 
-    IF l_has_rows THEN
-        al('</div></div>');  /* close last theme-list + topic-item */
-    END IF;
-
-    /* assemble */
+    /* ── Assemble final HTML ────────────────────────────────── */
     DBMS_LOB.CREATETEMPORARY(l_html, TRUE);
 
     IF l_has_rows THEN
@@ -125,6 +170,10 @@ BEGIN
             ||     '<button type="button" id="gls-search-clear" class="gls-search-clear-btn" style="display:none">&#10005; Clear</button>'
             ||     '<button type="button" id="gls-hdr-edit" class="gls-search-btn" disabled>&#9998; Edit</button>'
             ||     '<button type="button" id="gls-hdr-submit" class="gls-search-btn gls-btn-submit" style="display:none" disabled>&#10003; Submit Changes</button>'
+            ||     CASE WHEN UPPER(apex_application.g_user) IN ('SAALI','SMALMHEIRI','RMOSMAN')
+                       THEN '<button type="button" id="gls-hdr-save-admin" class="gls-search-btn gls-btn-admin" style="display:none" disabled>&#128274; Save as Admin</button>'
+                            || '<span id="gls-is-admin" style="display:none">Y</span>'
+                       ELSE '' END
             ||     '<button type="button" id="gls-hdr-new-term" class="gls-search-btn">&#43; New Term</button>'
             ||   '</div>'
             ||   '<div class="gls-body">'
@@ -158,7 +207,6 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        IF c%ISOPEN THEN CLOSE c; END IF;
         RAISE;
 END F_BUSINESS_GLOSSARY_TREE;
 /

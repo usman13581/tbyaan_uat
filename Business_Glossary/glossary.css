@@ -84,14 +84,18 @@
 .gls-topic-btn.is-open .gls-topic-arrow { transform: rotate(90deg); color: #3b82f6; }
 
 .gls-topic-titles { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.gls-topic-en     { font-size: 13px; font-weight: 700; color: #1e3a5f; line-height: 1.35; letter-spacing: .01em; }
+.gls-topic-en     { font-size: 13px; font-weight: 600; color: #1e3a5f; line-height: 1.35; letter-spacing: .01em; }
 .gls-topic-btn.is-open .gls-topic-en { color: #1d4ed8; }
-.gls-topic-ar     { font-size: 12px; font-weight: 500; color: #6b7280; direction: rtl; text-align: right; line-height: 1.3; }
+.gls-topic-count  { font-size: 11px; font-weight: 500; color: #6b7280; margin-left: auto; padding-left: 6px; flex-shrink: 0; }
+.gls-topic-ar     { display: none; }
 .gls-topic-btn.is-open .gls-topic-ar { color: #3b82f6; }
 
 /* ── 6. THEME LIST ──────────────────────────────────────── */
 .gls-theme-list         { display: none; background: #f8faff; border-top: 1px solid #dbeafe; padding: 4px 0 8px; }
 .gls-theme-list.is-open { display: block; }
+
+/* ── 8b. THEME ITEM WRAPPER ─────────────────────────────── */
+.gls-theme-item { display: block; }
 
 /* ── 7. THEME BUTTON ────────────────────────────────────── */
 .gls-theme-btn {
@@ -110,13 +114,13 @@
     position: relative;
 }
 .gls-theme-btn::before { content: none; }
-.gls-theme-btn:hover   { background: #eff6ff; border-left-color: #93c5fd; }
+.gls-theme-btn:hover     { background: #eff6ff; border-left-color: #93c5fd; }
 .gls-theme-btn.is-active { background: #dbeafe; border-left-color: #2563eb; }
 
-.gls-theme-en { font-size: 12px; font-weight: 600; color: #374151; line-height: 1.4; }
-.gls-theme-btn:hover   .gls-theme-en { color: #1d4ed8; }
+.gls-theme-en { font-size: 13px; font-weight: 600; color: #374151; line-height: 1.4; }
+.gls-theme-btn:hover     .gls-theme-en { color: #1d4ed8; }
 .gls-theme-btn.is-active .gls-theme-en { color: #1d4ed8; font-weight: 700; }
-.gls-theme-ar { font-size: 11px; font-weight: 400; color: #9ca3af; direction: rtl; text-align: right; line-height: 1.3; }
+.gls-theme-ar { display: none; }
 .gls-theme-btn.is-active .gls-theme-ar { color: #3b82f6; }
 
 /* ── 8. RIGHT PANEL ─────────────────────────────────────── */
@@ -377,6 +381,69 @@
 }
 
 /* ── 20f. NEW TERM BUTTON & SAVE ────────────────────────── */
+/* ── DELETE CONFIRMATION MODAL ──────────────────────────── */
+.gls-del-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 99999;
+    animation: gls-fade-in .15s ease;
+}
+@keyframes gls-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.gls-del-dialog {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 32px 36px 28px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.18);
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    animation: gls-pop-in .18s ease;
+}
+@keyframes gls-pop-in { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.gls-del-icon  { font-size: 36px; margin-bottom: 12px; }
+.gls-del-title { font-size: 18px; font-weight: 700; color: #111827; margin-bottom: 10px; }
+.gls-del-msg   { font-size: 14px; color: #4b5563; line-height: 1.7; margin-bottom: 6px; }
+.gls-del-warn  { font-size: 12px; color: #ef4444; display: block; margin-top: 6px; }
+
+.gls-del-actions {
+    display: flex; gap: 12px; justify-content: center; margin-top: 24px;
+}
+.gls-del-btn-cancel {
+    flex: 1; padding: 10px 0; border: 1.5px solid #e5e7eb;
+    background: #ffffff; color: #374151; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    transition: background .15s, border-color .15s;
+}
+.gls-del-btn-cancel:hover { background: #f9fafb; border-color: #9ca3af; }
+
+.gls-del-btn-confirm {
+    flex: 1; padding: 10px 0; border: 1.5px solid #fca5a5;
+    background: #fee2e2; color: #b91c1c; border-radius: 8px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    transition: background .15s, border-color .15s;
+}
+.gls-del-btn-confirm:hover { background: #fecaca; border-color: #f87171; }
+
+.gls-delete-term {
+    background: #fff5f5;
+    color: #dc2626;
+    border-color: #fecaca;
+    margin-right: auto;
+}
+.gls-delete-term:hover:not(:disabled) {
+    background: #fee2e2;
+    border-color: #f87171;
+    color: #b91c1c;
+    box-shadow: 0 2px 8px rgba(220,38,38,.15);
+    transform: translateY(-1px);
+}
+
 .gls-btn-save {
     background: #111827;
     color: #ffffff;
@@ -401,6 +468,17 @@
     color: #ffffff;
     box-shadow: 0 2px 8px rgba(37,99,235,.3);
 }
+.gls-btn-admin {
+    background: #7c3aed;
+    color: #ffffff;
+    border-color: #7c3aed;
+}
+.gls-btn-admin:hover:not(:disabled) {
+    background: #6d28d9;
+    border-color: #6d28d9;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(124,58,237,.3);
+}
 
 .gls-new-term-label {
     font-size: 12px;
@@ -410,12 +488,91 @@
     flex: 1;
 }
 
+/* ── 8c. DATASET LIST — appears after all themes ────────── */
+.gls-dataset-list {
+    display: block;
+    background: #f0f5ff;
+    border-top: 2px solid #dbeafe;
+    padding: 2px 0 6px;
+    margin-top: 4px;
+}
+
+/* ── 8c2. DATASET ITEM WRAPPER ──────────────────────────── */
+.gls-dataset-item { display: block; }
+
+/* ── 8d. DATASET BUTTON ─────────────────────────────────── */
+.gls-dataset-btn {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px 6px 36px;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    transition: background .12s, border-color .12s;
+}
+.gls-dataset-btn::before { content: none; }
+.gls-dataset-btn:hover     { background: #eff6ff; border-left-color: #93c5fd; }
+.gls-dataset-btn.is-active { background: #dbeafe; border-left-color: #2563eb; }
+
+/* nav arrow */
+.gls-ds-arrow {
+    font-size: 14px; color: #9ca3af; font-weight: 700;
+    flex-shrink: 0; display: inline-block; line-height: 1;
+    transition: color .15s;
+}
+.gls-dataset-btn:hover   .gls-ds-arrow { color: #6b7280; }
+.gls-dataset-btn.is-active .gls-ds-arrow { color: #2563eb; }
+
+.gls-dataset-en { font-size: 13px; font-weight: 600; color: #374151; line-height: 1.4; flex: 1; }
+.gls-dataset-btn:hover     .gls-dataset-en { color: #1d4ed8; }
+.gls-dataset-btn.is-active .gls-dataset-en { color: #1d4ed8; font-weight: 700; }
+.gls-dataset-ar { display: none; }
+
+/* ── 8e. TERM LIST (inside expanded dataset) ────────────── */
+.gls-term-list {
+    display: none;
+    background: #eef3ff;
+    border-top: 1px solid #dbeafe;
+    padding: 2px 0 4px;
+}
+
+/* ── 8f. TERM NAV BUTTON ────────────────────────────────── */
+.gls-term-nav-btn {
+    width: 100%;
+    display: block;
+    padding: 5px 16px 5px 56px;
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'Dubai', 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4b5563;
+    line-height: 1.45;
+    transition: background .1s, color .1s, border-color .1s;
+}
+.gls-term-nav-btn:hover     { background: #eff6ff; border-left-color: #93c5fd; color: #1d4ed8; }
+.gls-term-nav-btn.is-active { background: #dbeafe; border-left-color: #2563eb; color: #1d4ed8; font-weight: 600; }
+
+.gls-term-loading,
+.gls-term-empty { padding: 5px 16px 5px 56px; font-size: 13px; color: #9ca3af; display: block; }
+
 /* ── 21. FOCUS RESET ────────────────────────────────────── */
 .gls-topic-btn:focus, .gls-topic-btn:focus-visible,
 .gls-theme-btn:focus, .gls-theme-btn:focus-visible,
+.gls-dataset-btn:focus, .gls-dataset-btn:focus-visible,
 .gls-nav-btn:focus,   .gls-nav-btn:focus-visible { outline: none !important; box-shadow: none !important; }
 .gls-topic-btn::-moz-focus-inner,
 .gls-theme-btn::-moz-focus-inner,
+.gls-dataset-btn::-moz-focus-inner,
 .gls-nav-btn::-moz-focus-inner { border: 0; }
 
 /* ── 22. HIDE APEX ERROR ────────────────────────────────── */
