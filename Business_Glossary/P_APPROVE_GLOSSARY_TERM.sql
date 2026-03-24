@@ -167,12 +167,12 @@ BEGIN
                               FROM SC_QAWS.GLOSSARY;
                             INSERT INTO SC_QAWS.GLOSSARY (
                                 id, primaryname, refnumber, parent_id,
-                                "type", status, ispublic,
+                                "type", status, ispublic, securityclassification,
                                 createdatetime, lastupdatedatetime
                             ) VALUES (
                                 l_ds_id, l_dataset_en,
                                 'DS-' || TO_CHAR(l_ds_id),
-                                l_parent_id, 9, 1, 1, SYSDATE, SYSDATE
+                                l_parent_id, 9, 1, 1, 1, SYSDATE, SYSDATE
                             );
                             upsert_cf(l_ds_id, 120, l_dataset_ar);
                     END;
@@ -250,7 +250,7 @@ BEGIN
                                   FROM SC_QAWS.GLOSSARY;
                                 INSERT INTO SC_QAWS.GLOSSARY (
                                     id, primaryname, refnumber, parent_id,
-                                    "type", status, ispublic,
+                                    "type", status, ispublic, securityclassification,
                                     createdatetime, lastupdatedatetime
                                 ) VALUES (
                                     l_ds_id,
@@ -260,6 +260,7 @@ BEGIN
                                     9,    -- Dataset node
                                     1,    -- Active
                                     1,    -- Public
+                                    1,    -- Security classification default
                                     SYSDATE,
                                     SYSDATE
                                 );
