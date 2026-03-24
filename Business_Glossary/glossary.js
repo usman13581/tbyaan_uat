@@ -552,16 +552,16 @@ var GlossaryApp = (function () {
                     try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
                     if (result.status === 'ok') {
                         if (isNew) {
-                            /* show success message then reload so the tree reflects the new dataset */
+                            /* update left tree dynamically — no page reload needed */
+                            addDatasetToTree(curTopic, curTheme, payload.dataset_en);
                             container.innerHTML =
                                 '<div class="gls-success-msg">' +
                                     '<div class="gls-success-icon">&#10003;</div>' +
                                     '<div class="gls-success-title">Term Added Successfully</div>' +
-                                    '<div class="gls-success-text">The term has been added directly to the glossary by an administrator. Refreshing...</div>' +
+                                    '<div class="gls-success-text">The term has been added directly to the glossary by an administrator.</div>' +
                                 '</div>';
                             var hdrEditBtn = document.getElementById('gls-hdr-edit');
                             if (hdrEditBtn) { hdrEditBtn.style.display = ''; hdrEditBtn.disabled = true; }
-                            setTimeout(function () { window.location.reload(); }, 1500);
                         } else {
                             /* hide both action buttons, restore Edit */
                             if (hdrSubmit)    { hdrSubmit.style.display    = 'none'; hdrSubmit.disabled    = true; }
@@ -915,6 +915,56 @@ var GlossaryApp = (function () {
     }
     function escAttr(s) {
         return (s || '').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    /* ── Dynamically add a dataset button to the left tree ── */
+    function addDatasetToTree(topic, theme, dataset) {
+        var root = document.querySelector('.gls-tree-wrap');
+        if (!root || !dataset) return;
+
+        /* skip if button already exists */
+        var existing = root.querySelector(
+            '.gls-dataset-btn[data-topic="' + escAttr(topic) +
+            '"][data-theme="'  + escAttr(theme)  +
+            '"][data-dataset="' + escAttr(dataset) + '"]'
+        );
+        if (existing) return;
+
+        /* find the theme-list containing this topic+theme */
+        var themeList = null;
+        root.querySelectorAll('.gls-theme-btn').forEach(function (btn) {
+            if (btn.getAttribute('data-topic') === topic &&
+                btn.getAttribute('data-theme') === theme) {
+                themeList = btn.closest('.gls-theme-list');
+            }
+        });
+        if (!themeList) return;
+
+        /* find or create .gls-dataset-list inside that theme-list */
+        var dsList = themeList.querySelector('.gls-dataset-list');
+        if (!dsList) {
+            dsList = document.createElement('div');
+            dsList.className = 'gls-dataset-list';
+            themeList.appendChild(dsList);
+        }
+
+        /* build and append the new dataset item */
+        var item = document.createElement('div');
+        item.className = 'gls-dataset-item';
+        item.innerHTML =
+            '<button type="button" class="gls-dataset-btn"' +
+                ' data-topic="'   + escAttr(topic)   + '"' +
+                ' data-theme="'   + escAttr(theme)   + '"' +
+                ' data-dataset="' + escAttr(dataset) + '">' +
+                '<span class="gls-ds-arrow">&#8250;</span>' +
+                '<span class="gls-dataset-en">' + escHtml(dataset) + '</span>' +
+            '</button>' +
+            '<div class="gls-term-list"' +
+                ' data-topic="'   + escAttr(topic)   + '"' +
+                ' data-theme="'   + escAttr(theme)   + '"' +
+                ' data-dataset="' + escAttr(dataset) + '">' +
+            '</div>';
+        dsList.appendChild(item);
     }
 
     /* ── Search init ───────────────────────────────────────── */
