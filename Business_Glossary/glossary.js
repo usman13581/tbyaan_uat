@@ -294,6 +294,7 @@ var GlossaryApp = (function () {
                         '<span class="gls-new-topic"></span> &rsaquo; <span class="gls-new-theme"></span>' +
                     '</div>' +
                     '<button type="button" class="gls-nav-btn gls-submit-changes gls-btn-submit" disabled>&#10003; Submit for Approval</button>' +
+                    (isAdminUser() ? '<button type="button" class="gls-nav-btn gls-save-admin-new gls-btn-admin">&#128274; Save as Admin</button>' : '') +
                 '</div>' +
             '</div>';
 
@@ -499,8 +500,9 @@ var GlossaryApp = (function () {
 
     /* ── Save as Admin (direct save, no workflow) ─────────── */
     function saveAsAdmin(container) {
+        var isNew  = !!container.querySelector('.gls-new-mode');
         var data   = collectCardData(container);
-        var errors = validateCard(data, false);
+        var errors = validateCard(data, isNew);
 
         var prev = container.querySelector('.gls-val-errors');
         if (prev) prev.parentNode.removeChild(prev);
@@ -514,14 +516,16 @@ var GlossaryApp = (function () {
             return;
         }
 
-        var hdrSubmit    = document.getElementById('gls-hdr-submit');
-        var hdrSaveAdmin = document.getElementById('gls-hdr-save-admin');
-        if (hdrSubmit)    { hdrSubmit.disabled = true;    hdrSubmit.textContent    = '\u2713 Saving...'; }
-        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = true; hdrSaveAdmin.textContent = '\u2713 Saving...'; }
+        var hdrSubmit       = document.getElementById('gls-hdr-submit');
+        var hdrSaveAdmin    = document.getElementById('gls-hdr-save-admin');
+        var inlineAdminBtn  = container.querySelector('.gls-save-admin-new');
+        if (hdrSubmit)      { hdrSubmit.disabled = true;      hdrSubmit.textContent      = '\u2713 Saving...'; }
+        if (hdrSaveAdmin)   { hdrSaveAdmin.disabled = true;   hdrSaveAdmin.textContent   = '\u2713 Saving...'; }
+        if (inlineAdminBtn) { inlineAdminBtn.disabled = true; inlineAdminBtn.textContent = '\u2713 Saving...'; }
 
         var payload = {
-            type:          'UPDATE',
-            term_id:       String(curSeq),
+            type:          isNew ? 'NEW' : 'UPDATE',
+            term_id:       isNew ? null  : String(curSeq),
             code:          data.code,
             term_ref:      data.term_ref,
             parent_ref:    data.parent_ref,
@@ -547,20 +551,34 @@ var GlossaryApp = (function () {
                     var result;
                     try { result = JSON.parse(raw); } catch (e) { result = { status: 'error' }; }
                     if (result.status === 'ok') {
-                        /* hide both action buttons, restore Edit */
-                        if (hdrSubmit)    { hdrSubmit.style.display    = 'none'; hdrSubmit.disabled    = true; }
-                        if (hdrSaveAdmin) { hdrSaveAdmin.style.display = 'none'; hdrSaveAdmin.disabled = true; }
-                        var hdrEditBtn = document.getElementById('gls-hdr-edit');
-                        if (hdrEditBtn) { hdrEditBtn.style.display = ''; hdrEditBtn.disabled = false; hdrEditBtn.textContent = '\u270E Edit'; }
-                        /* lock fields back to view mode */
-                        container.querySelectorAll('.gls-user-field').forEach(function (f) { f.readOnly = true; });
-                        container.querySelectorAll('.gls-submit-fields').forEach(function (el) { el.style.display = 'none'; });
-                        /* clear any previous validation errors */
-                        var prevErr = container.querySelector('.gls-val-errors');
-                        if (prevErr) prevErr.parentNode.removeChild(prevErr);
+                        if (isNew) {
+                            /* show success message then reload so the tree reflects the new dataset */
+                            container.innerHTML =
+                                '<div class="gls-success-msg">' +
+                                    '<div class="gls-success-icon">&#10003;</div>' +
+                                    '<div class="gls-success-title">Term Added Successfully</div>' +
+                                    '<div class="gls-success-text">The term has been added directly to the glossary by an administrator. Refreshing...</div>' +
+                                '</div>';
+                            var hdrEditBtn = document.getElementById('gls-hdr-edit');
+                            if (hdrEditBtn) { hdrEditBtn.style.display = ''; hdrEditBtn.disabled = true; }
+                            setTimeout(function () { window.location.reload(); }, 1500);
+                        } else {
+                            /* hide both action buttons, restore Edit */
+                            if (hdrSubmit)    { hdrSubmit.style.display    = 'none'; hdrSubmit.disabled    = true; }
+                            if (hdrSaveAdmin) { hdrSaveAdmin.style.display = 'none'; hdrSaveAdmin.disabled = true; }
+                            var hdrEditBtn = document.getElementById('gls-hdr-edit');
+                            if (hdrEditBtn) { hdrEditBtn.style.display = ''; hdrEditBtn.disabled = false; hdrEditBtn.textContent = '\u270E Edit'; }
+                            /* lock fields back to view mode */
+                            container.querySelectorAll('.gls-user-field').forEach(function (f) { f.readOnly = true; });
+                            container.querySelectorAll('.gls-submit-fields').forEach(function (el) { el.style.display = 'none'; });
+                            /* clear any previous validation errors */
+                            var prevErr = container.querySelector('.gls-val-errors');
+                            if (prevErr) prevErr.parentNode.removeChild(prevErr);
+                        }
                     } else {
-                        if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
-                        if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
+                        if (hdrSubmit)      { hdrSubmit.disabled = false;      hdrSubmit.textContent      = '\u2713 Submit Changes'; }
+                        if (hdrSaveAdmin)   { hdrSaveAdmin.disabled = false;   hdrSaveAdmin.textContent   = '\uD83D\uDD12 Save as Admin'; }
+                        if (inlineAdminBtn) { inlineAdminBtn.disabled = false; inlineAdminBtn.textContent = '\uD83D\uDD12 Save as Admin'; }
                         var errDiv = document.createElement('div');
                         errDiv.className = 'gls-val-errors';
                         errDiv.textContent = result.message || 'Save failed. Please try again.';
@@ -569,8 +587,9 @@ var GlossaryApp = (function () {
                     }
                 },
                 error: function (xhr) {
-                    if (hdrSubmit)    { hdrSubmit.disabled = false;    hdrSubmit.textContent    = '\u2713 Submit Changes'; }
-                    if (hdrSaveAdmin) { hdrSaveAdmin.disabled = false; hdrSaveAdmin.textContent = '\uD83D\uDD12 Save as Admin'; }
+                    if (hdrSubmit)      { hdrSubmit.disabled = false;      hdrSubmit.textContent      = '\u2713 Submit Changes'; }
+                    if (hdrSaveAdmin)   { hdrSaveAdmin.disabled = false;   hdrSaveAdmin.textContent   = '\uD83D\uDD12 Save as Admin'; }
+                    if (inlineAdminBtn) { inlineAdminBtn.disabled = false; inlineAdminBtn.textContent = '\uD83D\uDD12 Save as Admin'; }
                     var errDiv = document.createElement('div');
                     errDiv.className = 'gls-val-errors';
                     errDiv.textContent = xhr.responseText || 'Network error. Please try again.';
@@ -667,6 +686,12 @@ var GlossaryApp = (function () {
             if (t.classList.contains('gls-submit-changes') && !t.disabled) {
                 var isNew = !!container.querySelector('.gls-new-mode');
                 saveDraft(container, isNew);
+                return;
+            }
+
+            /* save as admin (new term — direct insert, no workflow) */
+            if (t.classList.contains('gls-save-admin-new') && !t.disabled) {
+                saveAsAdmin(container);
                 return;
             }
 

@@ -7,6 +7,8 @@
 -- Inputs (via apex.server.process):
 --   x01 = search string (matches EN name, AR name, EN definition, code, term_ref)
 -- Returns up to 50 results as a JSON array.
+-- term_seq is partitioned by (topic, theme, dataset) to match
+-- the navigation in F_GLOSSARY_THEME_TERMS.
 -- ============================================================
 
 DECLARE
@@ -15,14 +17,15 @@ DECLARE
     l_first  BOOLEAN := TRUE;
 
     CURSOR c IS
-        -- ROW_NUMBER computed over ALL terms first (full theme position),
-        -- then filtered — so seq matches what F_GLOSSARY_THEME_TERMS returns.
+        -- ROW_NUMBER partitioned by (topic, theme, dataset) so seq matches
+        -- what F_GLOSSARY_THEME_TERMS returns for each group.
         SELECT term_name_en,
                term_name_ar,
                TO_CHAR("C#")                            AS code,
                term_ref,
                topic_name,
                theme_name,
+               dataset_name,
                SUBSTR(term_definition_en, 1, 200)       AS def_snippet,
                term_seq
           FROM (
@@ -32,9 +35,10 @@ DECLARE
                        term_ref,
                        topic_name,
                        theme_name,
+                       dataset_name,
                        term_definition_en,
                        ROW_NUMBER() OVER (
-                           PARTITION BY topic_name, theme_name
+                           PARTITION BY topic_name, theme_name, dataset_name
                            ORDER BY term_name_en, id
                        )                                AS term_seq
                   FROM sc_qaws.business_glossary
@@ -75,14 +79,15 @@ BEGIN
         END IF;
         DBMS_LOB.APPEND(l_json, TO_CLOB(
             '{' ||
-            '"name_en":'  || jstr(r.term_name_en)      || ',' ||
-            '"name_ar":'  || jstr(r.term_name_ar)      || ',' ||
-            '"code":'     || jstr(r.code)               || ',' ||
-            '"term_ref":' || jstr(r.term_ref)           || ',' ||
-            '"topic":'    || jstr(r.topic_name)         || ',' ||
-            '"theme":'    || jstr(r.theme_name)         || ',' ||
-            '"seq":'      || TO_CHAR(r.term_seq)        || ',' ||
-            '"def":'      || jstr(r.def_snippet)        ||
+            '"name_en":'   || jstr(r.term_name_en)  || ',' ||
+            '"name_ar":'   || jstr(r.term_name_ar)  || ',' ||
+            '"code":'      || jstr(r.code)           || ',' ||
+            '"term_ref":'  || jstr(r.term_ref)       || ',' ||
+            '"topic":'     || jstr(r.topic_name)     || ',' ||
+            '"theme":'     || jstr(r.theme_name)     || ',' ||
+            '"dataset":'   || jstr(r.dataset_name)   || ',' ||
+            '"seq":'       || TO_CHAR(r.term_seq)    || ',' ||
+            '"def":'       || jstr(r.def_snippet)    ||
             '}'
         ));
         l_first := FALSE;

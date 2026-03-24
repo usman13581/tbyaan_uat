@@ -159,10 +159,6 @@ BEGIN
     IF l_has_rows THEN
         DBMS_LOB.APPEND(l_html, TO_CLOB(
                '<div class="gls-tree-wrap">'
-            ||   '<div class="gls-page-title">'
-            ||     '<div class="gls-title-main">Business Glossary</div>'
-            ||     '<div class="gls-title-main-ar" dir="rtl">&#1575;&#1604;&#1605;&#1587;&#1585;&#1583; &#1575;&#1604;&#1578;&#1580;&#1575;&#1585;&#1610;</div>'
-            ||   '</div>'
             ||   '<div class="gls-search-bar">'
             ||     '<input type="text" id="gls-search-input" class="gls-search-input"'
             ||       ' placeholder="Search by term name, definition or code..." />'

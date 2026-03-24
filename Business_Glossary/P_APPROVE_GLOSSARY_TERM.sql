@@ -3,11 +3,14 @@
 -- Purpose:    Final approval step for glossary workflow.
 --
 -- NEW TERM request:
---   - Activates the draft row (ispublic=1, status=1)
+--   - If dataset_en is supplied and parent is a theme node,
+--     finds or creates a dataset node (type=9) under that theme
+--     and reparents the draft term under it.
+--   - Then activates the draft row (ispublic=1, status=1).
 --
 -- UPDATE TERM request:
 --   - Finds the original ACTIVE term by term_ref
---   - Syncs JSON data (name/def/source) to the original term
+--   - Syncs JSON data (name/def/source/dataset/justification/use) to the original term
 --   - Deletes the temporary draft row and its custom_field rows
 --   - Original term stays active with updated content
 --
@@ -71,13 +74,13 @@ AS
     END upsert_cf;
 
 BEGIN
-    -- ── resolve PROCESSES_LANDING_ID ───────────────────────────
+    -- ── resolve PROCESSES_LANDING_ID ───────────────────────
     SELECT WORKFLOW_TRANSACTION_VALUE
       INTO l_landing_id
       FROM WF_T_PROCESSES
      WHERE WORKFLOW_PROCESS_ID = p_workflow_process_id;
 
-    -- ── read latest JSON (includes any reviewer edits) ─────────
+    -- ── read latest JSON (includes any reviewer edits) ─────
     SELECT JSON_VAL
       INTO l_json
       FROM SEC_T_PROCESSES_LANDING
@@ -102,7 +105,7 @@ BEGIN
             '(landing_id=' || TO_CHAR(l_landing_id) || ')');
     END IF;
 
-    -- ── resolve parent_ref to parent_id ───────────────────────
+    -- ── resolve parent_ref to parent_id ───────────────────
     IF l_parent_ref IS NOT NULL THEN
         BEGIN
             SELECT id INTO l_parent_id
@@ -113,7 +116,7 @@ BEGIN
         END;
     END IF;
 
-    -- ── detect NEW vs UPDATE ───────────────────────────────────
+    -- ── detect NEW vs UPDATE ───────────────────────────────
     -- If another active public term with the same term_ref exists
     -- (id different from the draft), this is an UPDATE request.
     BEGIN
@@ -136,6 +139,48 @@ BEGIN
     -- PATH A: UPDATE — sync to original term, delete draft
     -- ══════════════════════════════════════════════════════════
     IF l_is_update THEN
+
+        -- ── Dataset reparenting for UPDATE ──────────────────
+        -- If dataset_en is given and the resolved parent is a theme
+        -- node (type 2 or 5), find or create the dataset node and
+        -- reparent the term there (same logic as PATH B).
+        IF l_dataset_en IS NOT NULL AND l_parent_id IS NOT NULL THEN
+            DECLARE
+                l_parent_type NUMBER;
+                l_ds_id       NUMBER;
+            BEGIN
+                SELECT "type" INTO l_parent_type
+                  FROM SC_QAWS.GLOSSARY
+                 WHERE id = l_parent_id;
+
+                IF l_parent_type IN (2, 5) THEN
+                    BEGIN
+                        SELECT id INTO l_ds_id
+                          FROM SC_QAWS.GLOSSARY
+                         WHERE parent_id   = l_parent_id
+                           AND "type"      = 9
+                           AND primaryname = l_dataset_en
+                           AND ROWNUM      = 1;
+                    EXCEPTION
+                        WHEN NO_DATA_FOUND THEN
+                            SELECT NVL(MAX(id), 0) + 1 INTO l_ds_id
+                              FROM SC_QAWS.GLOSSARY;
+                            INSERT INTO SC_QAWS.GLOSSARY (
+                                id, primaryname, refnumber, parent_id,
+                                "type", status, ispublic,
+                                createdatetime, lastupdatedatetime
+                            ) VALUES (
+                                l_ds_id, l_dataset_en,
+                                'DS-' || TO_CHAR(l_ds_id),
+                                l_parent_id, 9, 1, 1, SYSDATE, SYSDATE
+                            );
+                            upsert_cf(l_ds_id, 120, l_dataset_ar);
+                    END;
+                    l_parent_id := l_ds_id;
+                END IF;
+            EXCEPTION WHEN NO_DATA_FOUND THEN NULL;
+            END;
+        END IF;
 
         -- update original term with final approved data
         UPDATE SC_QAWS.GLOSSARY
@@ -167,6 +212,68 @@ BEGIN
     -- ══════════════════════════════════════════════════════════
     ELSE
 
+        -- ── Dataset node: find or create under theme ───────
+        -- If dataset_en is given and the resolved parent is a theme
+        -- node (type 2 or 5), we create/find a dataset node (type=9)
+        -- under that theme and reparent the term there.
+        IF l_dataset_en IS NOT NULL THEN
+            DECLARE
+                l_theme_id    NUMBER;
+                l_parent_type NUMBER;
+                l_ds_id       NUMBER;
+            BEGIN
+                -- use resolved parent_id; fall back to draft's current parent
+                l_theme_id := l_parent_id;
+                IF l_theme_id IS NULL THEN
+                    SELECT parent_id INTO l_theme_id
+                      FROM SC_QAWS.GLOSSARY
+                     WHERE id = l_gls_id;
+                END IF;
+
+                IF l_theme_id IS NOT NULL THEN
+                    SELECT "type" INTO l_parent_type
+                      FROM SC_QAWS.GLOSSARY
+                     WHERE id = l_theme_id;
+
+                    -- only insert dataset node when parent is a theme (type 2 or 5)
+                    IF l_parent_type IN (2, 5) THEN
+                        BEGIN
+                            SELECT id INTO l_ds_id
+                              FROM SC_QAWS.GLOSSARY
+                             WHERE parent_id   = l_theme_id
+                               AND "type"      = 9
+                               AND primaryname = l_dataset_en
+                               AND ROWNUM      = 1;
+                        EXCEPTION
+                            WHEN NO_DATA_FOUND THEN
+                                SELECT NVL(MAX(id), 0) + 1 INTO l_ds_id
+                                  FROM SC_QAWS.GLOSSARY;
+                                INSERT INTO SC_QAWS.GLOSSARY (
+                                    id, primaryname, refnumber, parent_id,
+                                    "type", status, ispublic,
+                                    createdatetime, lastupdatedatetime
+                                ) VALUES (
+                                    l_ds_id,
+                                    l_dataset_en,
+                                    'DS-' || TO_CHAR(l_ds_id),
+                                    l_theme_id,
+                                    9,    -- Dataset node
+                                    1,    -- Active
+                                    1,    -- Public
+                                    SYSDATE,
+                                    SYSDATE
+                                );
+                                -- store Arabic dataset name on the new node
+                                upsert_cf(l_ds_id, 120, l_dataset_ar);
+                        END;
+
+                        -- reparent term under the dataset node
+                        l_parent_id := l_ds_id;
+                    END IF;
+                END IF;
+            END;
+        END IF;
+
         -- sync latest JSON data to the draft row (reviewer may have edited)
         UPDATE SC_QAWS.GLOSSARY
            SET primaryname        = l_name_en,
@@ -188,7 +295,7 @@ BEGIN
 
     END IF;
 
-    -- ── close the workflow ticket ──────────────────────────────
+    -- ── close the workflow ticket ──────────────────────────
     UPDATE SEC_T_PROCESSES_LANDING
        SET IS_DONE      = 1,
            IS_ACTIVE    = 0,
@@ -198,7 +305,7 @@ BEGIN
 
     COMMIT;
 
-    -- ── refresh MV so changes appear immediately in glossary ───
+    -- ── refresh MV so changes appear immediately in glossary ─
     DBMS_MVIEW.REFRESH('SC_QAWS.BUSINESS_GLOSSARY', 'C');
 
 EXCEPTION

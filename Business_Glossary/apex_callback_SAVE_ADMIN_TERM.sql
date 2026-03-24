@@ -28,9 +28,13 @@ DECLARE
     l_justification VARCHAR2(4000);
     l_use           VARCHAR2(200);
 
+    -- parsed type
+    l_type      VARCHAR2(10);
+
     -- resolved IDs
     l_orig_id   NUMBER;
     l_parent_id NUMBER;
+    l_sec_class NUMBER;
     l_cf_id     NUMBER;
 
     FUNCTION jstr(p IN VARCHAR2) RETURN VARCHAR2 IS
@@ -75,6 +79,7 @@ BEGIN
     END IF;
 
     -- ── parse JSON ──────────────────────────────────────────
+    l_type          := NVL(JSON_VALUE(l_payload, '$.type'), 'UPDATE');
     l_term_ref      := JSON_VALUE(l_payload, '$.term_ref');
     l_parent_ref    := JSON_VALUE(l_payload, '$.parent_ref');
     l_name_en       := JSON_VALUE(l_payload, '$.name_en');
@@ -97,41 +102,125 @@ BEGIN
         RETURN;
     END IF;
 
-    -- ── find the active term by term_ref ─────────────────────
-    BEGIN
-        SELECT id INTO l_orig_id
-          FROM SC_QAWS.GLOSSARY
-         WHERE refnumber = l_term_ref
-           AND ispublic  = 1
-           AND status    = 1
-           AND ROWNUM    = 1;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN
-            HTP.P('{"status":"error","message":"Active term with ref ' || l_term_ref || ' not found."}');
-            RETURN;
-    END;
-
-    -- ── resolve parent_ref to parent_id (optional) ───────────
+    -- ── resolve parent_ref to parent_id ─────────────────────
     IF l_parent_ref IS NOT NULL THEN
         BEGIN
-            SELECT id INTO l_parent_id
+            SELECT id, securityclassification
+              INTO l_parent_id, l_sec_class
               FROM SC_QAWS.GLOSSARY
              WHERE refnumber = l_parent_ref
                AND ROWNUM    = 1;
         EXCEPTION
-            WHEN NO_DATA_FOUND THEN l_parent_id := NULL;
+            WHEN NO_DATA_FOUND THEN l_parent_id := NULL; l_sec_class := NULL;
         END;
     END IF;
 
-    -- ── update the glossary row directly ─────────────────────
-    UPDATE SC_QAWS.GLOSSARY
-       SET primaryname        = l_name_en,
-           description        = l_def_en,
-           parent_id          = NVL(l_parent_id, parent_id),
-           lastupdatedatetime = SYSDATE
-     WHERE id = l_orig_id;
+    -- ── resolve dataset node (find or create type=9 under theme) ──
+    -- Applies when dataset_en is given and the resolved parent is a
+    -- theme node (type 2 or 5). The term is then placed under the
+    -- dataset node instead of directly under the theme.
+    DECLARE
+        l_parent_type NUMBER;
+        l_ds_id       NUMBER;
+    BEGIN
+        IF l_dataset_en IS NOT NULL AND l_parent_id IS NOT NULL THEN
+            BEGIN
+                SELECT "type" INTO l_parent_type
+                  FROM SC_QAWS.GLOSSARY
+                 WHERE id = l_parent_id;
+            EXCEPTION WHEN NO_DATA_FOUND THEN l_parent_type := NULL;
+            END;
 
-    -- ── upsert custom_field rows ─────────────────────────────
+            IF l_parent_type IN (2, 5) THEN
+                -- find existing dataset node
+                BEGIN
+                    SELECT id INTO l_ds_id
+                      FROM SC_QAWS.GLOSSARY
+                     WHERE parent_id   = l_parent_id
+                       AND "type"      = 9
+                       AND primaryname = l_dataset_en
+                       AND ROWNUM      = 1;
+                EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                        -- create new dataset node
+                        SELECT NVL(MAX(id), 0) + 1 INTO l_ds_id FROM SC_QAWS.GLOSSARY;
+                        INSERT INTO SC_QAWS.GLOSSARY (
+                            id, primaryname, refnumber, parent_id,
+                            "type", status, ispublic,
+                            createdatetime, lastupdatedatetime
+                        ) VALUES (
+                            l_ds_id, l_dataset_en,
+                            'DS-' || TO_CHAR(l_ds_id),
+                            l_parent_id, 9, 1, 1, SYSDATE, SYSDATE
+                        );
+                        -- store Arabic dataset name on the node
+                        IF l_dataset_ar IS NOT NULL THEN
+                            SELECT NVL(MAX(id), 0) + 1 INTO l_cf_id FROM SC_QAWS.CUSTOM_FIELD;
+                            INSERT INTO SC_QAWS.CUSTOM_FIELD
+                                (id, facetobjectid, customfieldmetadataid,
+                                 customfieldvalue, createdatetime, lastupdatedatetime)
+                            VALUES (l_cf_id, l_ds_id, 120, l_dataset_ar, SYSDATE, SYSDATE);
+                        END IF;
+                END;
+                -- reparent term under the dataset node
+                l_parent_id := l_ds_id;
+            END IF;
+        END IF;
+    END;
+
+    -- ══════════════════════════════════════════════════════════
+    -- PATH A: NEW — insert directly as active (no workflow)
+    -- ══════════════════════════════════════════════════════════
+    IF l_type = 'NEW' THEN
+
+        IF l_parent_id IS NULL THEN
+            HTP.P('{"status":"error","message":"Parent Ref is required for new terms."}');
+            RETURN;
+        END IF;
+
+        SELECT NVL(MAX(id), 0) + 1 INTO l_orig_id FROM SC_QAWS.GLOSSARY;
+
+        INSERT INTO SC_QAWS.GLOSSARY (
+            id, primaryname, description, refnumber, parent_id,
+            "type", status, ispublic, securityclassification,
+            createdatetime, lastupdatedatetime
+        ) VALUES (
+            l_orig_id, l_name_en, l_def_en, l_term_ref, l_parent_id,
+            3,   -- standard term type
+            1,   -- Active
+            1,   -- Public (visible immediately)
+            l_sec_class,
+            SYSDATE, SYSDATE
+        );
+
+    -- ══════════════════════════════════════════════════════════
+    -- PATH B: UPDATE — find active term and update in place
+    -- ══════════════════════════════════════════════════════════
+    ELSE
+
+        BEGIN
+            SELECT id INTO l_orig_id
+              FROM SC_QAWS.GLOSSARY
+             WHERE refnumber = l_term_ref
+               AND ispublic  = 1
+               AND status    = 1
+               AND ROWNUM    = 1;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                HTP.P('{"status":"error","message":"Active term with ref ' || l_term_ref || ' not found."}');
+                RETURN;
+        END;
+
+        UPDATE SC_QAWS.GLOSSARY
+           SET primaryname        = l_name_en,
+               description        = l_def_en,
+               parent_id          = NVL(l_parent_id, parent_id),
+               lastupdatedatetime = SYSDATE
+         WHERE id = l_orig_id;
+
+    END IF;
+
+    -- ── upsert custom_field rows (works for both NEW and UPDATE) ──
     upsert_cf(l_orig_id, 120, l_name_ar);
     upsert_cf(l_orig_id, 121, l_def_ar);
     upsert_cf(l_orig_id, 146, l_source);

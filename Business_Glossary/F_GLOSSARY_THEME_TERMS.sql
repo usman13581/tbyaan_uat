@@ -1,7 +1,8 @@
 CREATE OR REPLACE FUNCTION SC_QAWS.F_GLOSSARY_THEME_TERMS (
-    p_topic_name  IN VARCHAR2,
-    p_theme_name  IN VARCHAR2,
-    p_term_seq    IN NUMBER DEFAULT 1
+    p_topic_name   IN VARCHAR2,
+    p_theme_name   IN VARCHAR2,
+    p_term_seq     IN NUMBER  DEFAULT 1,
+    p_dataset_name IN VARCHAR2 DEFAULT NULL
 )
     RETURN CLOB
 IS
@@ -43,15 +44,18 @@ IS
     END jstr;
 
 BEGIN
-    -- Total count for this topic/theme (MV scan is fast with idx_bg_topic_theme)
+    -- Total count for this topic/theme/dataset group
     SELECT COUNT(*) INTO l_total
       FROM sc_qaws.business_glossary
      WHERE "Axon Viewing"  = 'Public'
-       AND glossary_name  != 'National Standards for Statistical Data (NSSD)'
-       AND topic_name      = p_topic_name
-       AND theme_name      = p_theme_name;
+       AND glossary_name   != 'National Standards for Statistical Data (NSSD)'
+       AND topic_name       = p_topic_name
+       AND theme_name       = p_theme_name
+       AND (   (p_dataset_name IS NOT NULL AND dataset_name  = p_dataset_name)
+            OR (p_dataset_name IS NULL     AND dataset_name IS NULL)
+           );
 
-    -- Fetch exactly the one row at position p_term_seq — no loop needed
+    -- Fetch the row at position p_term_seq within this group
     SELECT id, "C#", term_ref,
            dataset_name,      dataset_name_ar,
            term_name_en,      term_name_ar,
@@ -71,9 +75,12 @@ BEGIN
                    ROW_NUMBER() OVER (ORDER BY term_name_en, id) AS term_seq
               FROM sc_qaws.business_glossary
              WHERE "Axon Viewing"  = 'Public'
-               AND glossary_name  != 'National Standards for Statistical Data (NSSD)'
-               AND topic_name      = p_topic_name
-               AND theme_name      = p_theme_name
+               AND glossary_name   != 'National Standards for Statistical Data (NSSD)'
+               AND topic_name       = p_topic_name
+               AND theme_name       = p_theme_name
+               AND (   (p_dataset_name IS NOT NULL AND dataset_name  = p_dataset_name)
+                    OR (p_dataset_name IS NULL     AND dataset_name IS NULL)
+                   )
            )
      WHERE term_seq = p_term_seq;
 
@@ -147,8 +154,8 @@ BEGIN
      || '"parent_ref":'  || jstr(r.parent_term_ref)   || ','
      || '"name_en":'     || jstr(r.term_name_en)      || ','
      || '"name_ar":'     || jstr(r.term_name_ar)      || ','
-     || '"dataset_en":'  || jstr(l_dataset_en)          || ','
-     || '"dataset_ar":'  || jstr(l_dataset_ar)          || ','
+     || '"dataset_en":'  || jstr(l_dataset_en)         || ','
+     || '"dataset_ar":'  || jstr(l_dataset_ar)         || ','
      || '"source":'      || jstr(l_src)
     ));
 
