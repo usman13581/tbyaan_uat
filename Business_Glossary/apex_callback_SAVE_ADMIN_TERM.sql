@@ -115,6 +115,26 @@ BEGIN
         END;
     END IF;
 
+    -- ── fallback security classification from sibling term ───────
+    -- Theme/dataset nodes usually have NULL securityclassification;
+    -- inherit from an existing active term under the same parent,
+    -- or default to 1 (Public) if none found.
+    IF l_sec_class IS NULL AND l_parent_id IS NOT NULL THEN
+        BEGIN
+            SELECT securityclassification INTO l_sec_class
+              FROM SC_QAWS.GLOSSARY
+             WHERE parent_id              = l_parent_id
+               AND "type"                 = 3
+               AND status                 = 1
+               AND ispublic               = 1
+               AND securityclassification IS NOT NULL
+               AND ROWNUM                 = 1;
+        EXCEPTION WHEN NO_DATA_FOUND THEN
+            l_sec_class := 1;
+        END;
+    END IF;
+    IF l_sec_class IS NULL THEN l_sec_class := 1; END IF;
+
     -- ── resolve dataset node (find or create type=9 under theme) ──
     -- Applies when dataset_en is given and the resolved parent is a
     -- theme node (type 2 or 5). The term is then placed under the
